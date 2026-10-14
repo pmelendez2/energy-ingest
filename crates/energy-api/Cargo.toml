@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+[package]
+name = "energy-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8"
+energy-store = { path = "../energy-store" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.9.0", default-features = false, features = ["mysql", "runtime-tokio"] }
+utoipa = "6.0"
+utoipa-swagger-ui = { version = "10.0", default-features = false, features = ["axum", "vendored"] }
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "net"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

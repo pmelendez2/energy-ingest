@@ -1,0 +1,224 @@
+<ns3:feed xmlns="http://www.sempra.com/eus/service/bean" xmlns:ns2="http://naesb.org/espi" xmlns:ns3="http://www.w3.org/2005/Atom">
+  <ns3:id>urn:uuid:f0c2b208-2d46-5c9b-82fc-89384c9dd0da</ns3:id>
+  <ns3:title>&lt;![CDATA[SDG&amp;E Generated AMI Data File for UtilityAPI]]&gt;</ns3:title>
+  <ns3:author>
+    <ns3:name>Meter Data Service (MDS)</ns3:name>
+  </ns3:author>
+  <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ThirdParty/#iD/Batch" rel="self"/>
+  <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+  <ns3:entry>
+    <ns3:id>urn:uuid:32e2e22b-6af7-5462-b54c-f938b69f3f21</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>Pacific Standard Time</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/LocalTimeParameters/01" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/LocalTimeParameters" rel="up"/>
+    <ns3:content>
+      <ns2:LocalTimeParameters>
+        <ns2:dstEndRule>340E2000</ns2:dstEndRule>
+        <ns2:dstOffset>3600</ns2:dstOffset>
+        <ns2:dstStartRule>360E2000</ns2:dstStartRule>
+        <ns2:tzOffset>-28800</ns2:tzOffset>
+      </ns2:LocalTimeParameters>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+  <ns3:entry>
+    <ns3:id>urn:uuid:68e68264-e60e-59e7-bded-fff68fcb0b17</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>ReadingType for Data Scenario 01</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType/0701" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType" rel="up"/>
+    <ns3:content>
+      <ns2:ReadingType>
+        <ns2:accumulationBehaviour>4</ns2:accumulationBehaviour>
+        <ns2:commodity>1</ns2:commodity>
+        <ns2:currency>840</ns2:currency>
+        <ns2:dataQualifier>12</ns2:dataQualifier>
+        <ns2:flowDirection>1</ns2:flowDirection>
+        <ns2:intervalLength>3600</ns2:intervalLength>
+        <ns2:kind>12</ns2:kind>
+        <ns2:phase>0</ns2:phase>
+        <ns2:powerOfTenMultiplier>0</ns2:powerOfTenMultiplier>
+        <ns2:timeAttribute>0</ns2:timeAttribute>
+        <ns2:uom>72</ns2:uom>
+      </ns2:ReadingType>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+  <ns3:entry>
+    <ns3:id>urn:uuid:de81e6b6-d7f9-5312-968c-3bd550249d0d</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>ReadingType for Data Scenario 02</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType/0702" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType" rel="up"/>
+    <ns3:content>
+      <ns2:ReadingType>
+        <ns2:accumulationBehaviour>4</ns2:accumulationBehaviour>
+        <ns2:commodity>1</ns2:commodity>
+        <ns2:currency>840</ns2:currency>
+        <ns2:dataQualifier>12</ns2:dataQualifier>
+        <ns2:flowDirection>19</ns2:flowDirection>
+        <ns2:intervalLength>3600</ns2:intervalLength>
+        <ns2:kind>12</ns2:kind>
+        <ns2:phase>0</ns2:phase>
+        <ns2:powerOfTenMultiplier>0</ns2:powerOfTenMultiplier>
+        <ns2:timeAttribute>0</ns2:timeAttribute>
+        <ns2:uom>72</ns2:uom>
+      </ns2:ReadingType>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+  <ns3:entry>
+    <ns3:id>urn:uuid:cc900fdf-1718-540f-a666-8e37db9f27e5</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>ReadingType for Data Scenario 03</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType/0203" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType" rel="up"/>
+    <ns3:content>
+      <ns2:ReadingType>
+        <ns2:accumulationBehaviour>4</ns2:accumulationBehaviour>
+        <ns2:commodity>1</ns2:commodity>
+        <ns2:currency>840</ns2:currency>
+        <ns2:dataQualifier>12</ns2:dataQualifier>
+        <ns2:flowDirection>1</ns2:flowDirection>
+        <ns2:intervalLength>900</ns2:intervalLength>
+        <ns2:kind>12</ns2:kind>
+        <ns2:phase>0</ns2:phase>
+        <ns2:powerOfTenMultiplier>0</ns2:powerOfTenMultiplier>
+        <ns2:timeAttribute>0</ns2:timeAttribute>
+        <ns2:uom>72</ns2:uom>
+      </ns2:ReadingType>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+  <ns3:entry>
+    <ns3:id>urn:uuid:639726b4-f1dc-55a6-ad35-629bb9231df2</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>ReadingType for Data Scenario 04</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType/0204" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType" rel="up"/>
+    <ns3:content>
+      <ns2:ReadingType>
+        <ns2:accumulationBehaviour>4</ns2:accumulationBehaviour>
+        <ns2:commodity>1</ns2:commodity>
+        <ns2:currency>840</ns2:currency>
+        <ns2:dataQualifier>12</ns2:dataQualifier>
+        <ns2:flowDirection>19</ns2:flowDirection>
+        <ns2:intervalLength>900</ns2:intervalLength>
+        <ns2:kind>12</ns2:kind>
+        <ns2:phase>0</ns2:phase>
+        <ns2:powerOfTenMultiplier>0</ns2:powerOfTenMultiplier>
+        <ns2:timeAttribute>0</ns2:timeAttribute>
+        <ns2:uom>72</ns2:uom>
+      </ns2:ReadingType>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+  <ns3:entry>
+    <ns3:id>urn:uuid:e35535d6-9e00-58c1-9dc3-c40831c1451c</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>ReadingType for Data Scenario 05</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType/0405" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType" rel="up"/>
+    <ns3:content>
+      <ns2:ReadingType>
+        <ns2:accumulationBehaviour>4</ns2:accumulationBehaviour>
+        <ns2:commodity>7</ns2:commodity>
+        <ns2:currency>840</ns2:currency>
+        <ns2:dataQualifier>12</ns2:dataQualifier>
+        <ns2:flowDirection>1</ns2:flowDirection>
+        <ns2:intervalLength>86400</ns2:intervalLength>
+        <ns2:kind>12</ns2:kind>
+        <ns2:phase>0</ns2:phase>
+        <ns2:powerOfTenMultiplier>-3</ns2:powerOfTenMultiplier>
+        <ns2:timeAttribute>0</ns2:timeAttribute>
+        <ns2:uom>169</ns2:uom>
+      </ns2:ReadingType>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+  <ns3:entry>
+    <ns3:id>urn:uuid:dff280e1-6b35-5da8-a7e8-91a1e6727665</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>Usages Point Block for -  900001</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/RetailCustomer/900001/UsagePoint/f0c2b208-2d46-5c9b-82fc-89384c9dd0da" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/RetailCustomer/900001/UsagePoint" rel="up"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/RetailCustomer/900001/UsagePoint/f0c2b208-2d46-5c9b-82fc-89384c9dd0da/MeterReading" rel="related"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/LocalTimeParameters/01" rel="related"/>
+    <ns3:content>
+      <ns2:UsagePoint>
+        <ns2:ServiceCategory>
+          <ns2:kind>1</ns2:kind>
+        </ns2:ServiceCategory>
+      </ns2:UsagePoint>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+  <ns3:entry>
+    <ns3:id>urn:uuid:ec969972-fd18-5276-bd67-75225cb76277</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>Meter Reading Block for -  900001
+		</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/RetailCustomer/900001/UsagePoint/f0c2b208-2d46-5c9b-82fc-89384c9dd0da/MeterReading/05" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/RetailCustomer/900001/UsagePoint/f0c2b208-2d46-5c9b-82fc-89384c9dd0da/MeterReading" rel="up"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/RetailCustomer/900001/UsagePoint/f0c2b208-2d46-5c9b-82fc-89384c9dd0da/MeterReading/05/IntervalBlock" rel="related"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/ReadingType/0405" rel="related"/>
+    <ns3:content>
+      <ns2:MeterReading/>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+  <ns3:entry>
+    <ns3:id>urn:uuid:60e37883-4a04-5e28-8246-52c05d19e295</ns3:id>
+    <ns3:author>
+      <ns3:name>Meter Data Service (MDS)</ns3:name>
+    </ns3:author>
+    <ns3:title>Interval Block for Usage Point -900001</ns3:title>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/RetailCustomer/900001/UsagePoint/f0c2b208-2d46-5c9b-82fc-89384c9dd0da/MeterReading/05/IntervalBlock/1" rel="self"/>
+    <ns3:link href="https://mds.sempra.com/DataCustodian/espi/1_1/resource/RetailCustomer/900001/UsagePoint/f0c2b208-2d46-5c9b-82fc-89384c9dd0da/MeterReading/05/IntervalBlock" rel="up"/>
+    <ns3:content>
+      <ns2:IntervalBlock>
+        <ns2:interval>
+          <ns2:duration>86400</ns2:duration>
+          <ns2:start>1791356340</ns2:start>
+        </ns2:interval>
+        <ns2:IntervalReading>
+          <ns2:ReadingQuality>
+            <ns2:quality>01</ns2:quality>
+          </ns2:ReadingQuality>
+          <ns2:timePeriod>
+            <ns2:duration>86400</ns2:duration>
+            <ns2:start>1791356340</ns2:start>
+          </ns2:timePeriod>
+          <ns2:value>0</ns2:value>
+        </ns2:IntervalReading>
+      </ns2:IntervalBlock>
+    </ns3:content>
+    <ns3:updated>2026-10-07T12:00:00Z</ns3:updated>
+    <ns3:published>2026-10-07T12:00:00Z</ns3:published>
+  </ns3:entry>
+</ns3:feed>

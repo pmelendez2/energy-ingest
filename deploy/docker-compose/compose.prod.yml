@@ -1,0 +1,120 @@
+# SPDX-License-Identifier: MIT
+
+services:
+  mariadb:
+    image: ${ENGY_DB_IMAGE}
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${ENGY_DB_NAME}
+      MARIADB_USER: ${ENGY_DB_USER}
+      MARIADB_PASSWORD_FILE: /run/secrets/energy_db_pwd
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/energy_db_root_pwd
+    secrets:
+      - energy_db_pwd
+      - energy_db_root_pwd
+    volumes:
+      - energy-db-data:/var/lib/mysql
+      - type: bind
+        source: ./10-runtime-grants.sh
+        target: /docker-entrypoint-initdb.d/10-runtime-grants.sh
+        read_only: true
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - --connect
+        - --innodb_initialized
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    networks:
+      - energy-db
+
+  # One-shot migration job. Never runs against a development database.
+  migrate:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.prod
+    image: energy-ingest-admin:local
+    restart: "no"
+    command: ["database", "bootstrap"]
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      ENGY_DB_NAME: ${ENGY_DB_NAME}
+    secrets:
+      - energy_db_root_pwd
+    networks:
+      - energy-db
+
+  # Operator-only import job; not a public web/API service.
+  import:
+    profiles: ["manual"]
+    image: energy-ingest-admin:local
+    entrypoint: ["/usr/local/bin/energy-store-import-prod-entrypoint"]
+    restart: "no"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      ENGY_DB_NAME: ${ENGY_DB_NAME}
+      ENGY_DB_USER: ${ENGY_DB_USER}
+    secrets:
+      - energy_db_pwd
+    volumes:
+      - type: bind
+        source: ${ENGY_IMPORT_DIR:-./private-imports}
+        target: /imports
+        read_only: true
+    networks:
+      - energy-db
+
+  # Read-only HTTP API. Host loopback-only by default.
+  api:
+    profiles: ["api"]
+    image: energy-ingest-admin:local
+    entrypoint: ["/usr/local/bin/engy-api-prod-ep"]
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      ENGY_DB_NAME: ${ENGY_DB_NAME}
+      ENGY_DB_USER: ${ENGY_DB_USER}
+      ENGY_API_LISTEN: 0.0.0.0:8080
+    secrets:
+      - energy_db_pwd
+    ports:
+      - "${ENGY_API_BIND_IP:-127.0.0.1}:${ENGY_API_PORT:-8080}:8080"
+    networks:
+      - energy-db
+
+  admin:
+    profiles: ["maintenance"]
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.prod
+    image: energy-ingest-admin:local
+    restart: "no"
+    environment:
+      ENGY_DB_NAME: ${ENGY_DB_NAME}
+      ENGY_DB_USER: ${ENGY_DB_USER}
+    secrets:
+      - energy_db_pwd
+    networks:
+      - energy-db
+
+volumes:
+  energy-db-data:
+
+networks:
+  energy-db:
+    internal: true
+
+secrets:
+  energy_db_pwd:
+    file: ${ENGY_DB_PWD_FILE}
+  energy_db_root_pwd:
+    file: ${ENGY_DB_ROOT_PWD_FILE}

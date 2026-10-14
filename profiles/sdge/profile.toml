@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: MIT
+
+schema_version = 1
+id = "sdge"
+name = "San Diego Gas & Electric"
+
+[provider]
+edc = "sdge"
+cca = []
+
+[[fixture]]
+file = "sdge-electric-one-day-hourly.xml"
+commodity = "electricity"
+flow_direction = 1
+unit_of_measure = 72
+interval_seconds = 3600
+reading_count = 24
+start_date = 2026-10-06
+end_date = 2026-10-06
+require_zero = true
+
+[[fixture]]
+file = "sdge-electric-one-month.xml"
+commodity = "electricity"
+flow_direction = 1
+unit_of_measure = 72
+interval_seconds = 3600
+reading_count = 744
+start_date = 2026-01-01
+end_date = 2026-01-31
+require_zero = false
+
+[[fixture]]
+file = "sdge-gas-one-month.xml"
+commodity = "natural_gas"
+flow_direction = 1
+unit_of_measure = 169
+interval_seconds = 86400
+reading_count = 31
+start_date = 2026-01-01
+end_date = 2026-01-31
+require_zero = false

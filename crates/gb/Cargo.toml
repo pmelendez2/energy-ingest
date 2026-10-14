@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT
+# AI-assisted: ChatGPT / GPT-6; 2026-10-08.
+
+[package]
+name = "gb"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4"
+quick-xml = "0.42.0"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+toml = "0.9"

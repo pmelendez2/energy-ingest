@@ -1,0 +1,254 @@
+// SPDX-License-Identifier: MIT
+
+//! Authenticated, read-only local HTTP API (ADR-0014, ADR-0024).
+//! Never log Authorization headers or serialize database errors.
+
+use axum::{
+    Json, Router,
+    extract::{Path, State},
+    http::{HeaderMap, StatusCode, header},
+    routing::get,
+};
+use energy_store::{
+    StoreError, authenticate_api_token, resolve_physical_meter_stream,
+};
+use serde::Serialize;
+use sqlx::{MySql, Pool};
+use utoipa::{OpenApi, ToSchema};
+use utoipa_swagger_ui::SwaggerUi;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: Pool<MySql>,
+}
+
+#[derive(Serialize, ToSchema)]
+struct ErrorBody {
+    error: &'static str,
+}
+
+type ApiError = (StatusCode, Json<ErrorBody>);
+
+fn failure(code: StatusCode, message: &'static str) -> ApiError {
+    (code, Json(ErrorBody { error: message }))
+}
+
+fn store_failure(error: StoreError) -> ApiError {
+    match error {
+        StoreError::NotFound => failure(StatusCode::NOT_FOUND, "not_found"),
+        _ => failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error"),
+    }
+}
+
+async fn require_auth(
+    pool: &Pool<MySql>,
+    headers: &HeaderMap,
+) -> Result<(), ApiError> {
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "));
+    let Some(token) = token else {
+        return Err(failure(StatusCode::UNAUTHORIZED, "unauthorized"));
+    };
+    match authenticate_api_token(pool, token).await {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(failure(StatusCode::UNAUTHORIZED, "unauthorized")),
+        Err(_) => {
+            Err(failure(StatusCode::SERVICE_UNAVAILABLE, "auth_unavailable"))
+        }
+    }
+}
+
+#[derive(Serialize, ToSchema, sqlx::FromRow)]
+struct Meter {
+    id: u64,
+    display_name: String,
+    commodity: u32,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/meters",
+    responses(
+        (status = 200, description = "Configured physical meters",
+         body = Vec<Meter>),
+        (status = 401, description = "Invalid or absent bearer token",
+         body = ErrorBody),
+        (status = 503, description = "Authentication store unavailable",
+         body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn meters(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<Meter>>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    let items = sqlx::query_as::<_, Meter>(
+        "SELECT id, display_name, commodity \
+         FROM physical_meter ORDER BY id",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error"))?;
+    Ok(Json(items))
+}
+
+#[derive(Serialize, ToSchema)]
+struct IntervalResponse {
+    start_utc: String,
+    duration_seconds: u32,
+    raw_value: i64,
+    meter_reading_id: u64,
+    accepted_revision_id: u64,
+    power_of_ten_multiplier: i16,
+    unit_of_measure: u32,
+}
+
+#[derive(Serialize, ToSchema)]
+struct IssueResponse {
+    kind: &'static str,
+    interval_reading_id: u64,
+    other_interval_reading_id: Option<u64>,
+}
+
+#[derive(Serialize, ToSchema)]
+struct StreamResponse {
+    physical_meter_id: u64,
+    candidate_count: usize,
+    resolved: bool,
+    intervals: Vec<IntervalResponse>,
+    issues: Vec<IssueResponse>,
+}
+
+fn issue_name(kind: energy_store::StreamIssueKind) -> &'static str {
+    use energy_store::StreamIssueKind as K;
+    match kind {
+        K::MissingAcceptedRevision => "missing_accepted_revision",
+        K::IncompleteMeasurementType => "incomplete_measurement_type",
+        K::IncompatibleMeasurementType => "incompatible_measurement_type",
+        K::ConflictingDuplicate => "conflicting_duplicate",
+        K::OverlappingIntervals => "overlapping_intervals",
+        K::InvalidDuration => "invalid_duration",
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/meters/{id}/stream",
+    params(("id" = u64, Path, description = "Physical meter ID")),
+    responses(
+        (status = 200, description = "Selected intervals or conflicts",
+         body = StreamResponse),
+        (status = 401, description = "Invalid or absent bearer token",
+         body = ErrorBody),
+        (status = 404, description = "Meter not found", body = ErrorBody),
+        (status = 503, description = "Authentication store unavailable",
+         body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn stream(
+    State(state): State<AppState>,
+    Path(id): Path<u64>,
+    headers: HeaderMap,
+) -> Result<Json<StreamResponse>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    let selected = resolve_physical_meter_stream(&state.pool, id)
+        .await
+        .map_err(store_failure)?;
+    let resolved = selected.issues.is_empty();
+    let intervals = selected
+        .intervals
+        .into_iter()
+        .map(|item| IntervalResponse {
+            start_utc: item.start.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            duration_seconds: item.duration_seconds,
+            raw_value: item.raw_value,
+            meter_reading_id: item.meter_reading_id,
+            accepted_revision_id: item.accepted_revision_id,
+            power_of_ten_multiplier: item.power_of_ten_multiplier,
+            unit_of_measure: item.unit_of_measure,
+        })
+        .collect();
+    let issues = selected
+        .issues
+        .into_iter()
+        .map(|item| IssueResponse {
+            kind: issue_name(item.kind),
+            interval_reading_id: item.interval_reading_id,
+            other_interval_reading_id: item.other_interval_reading_id,
+        })
+        .collect();
+    Ok(Json(StreamResponse {
+        physical_meter_id: id,
+        candidate_count: selected.candidate_count,
+        resolved,
+        intervals,
+        issues,
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/healthz",
+    responses((status = 204, description = "Process is alive")),
+)]
+async fn healthz() -> StatusCode {
+    StatusCode::NO_CONTENT
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(healthz, meters, stream),
+    components(schemas(
+        ErrorBody, Meter, IntervalResponse, IssueResponse, StreamResponse
+    )),
+    modifiers(&BearerSecurity),
+    info(
+        title = "Energy Ingest HTTP API",
+        version = "0.1.0",
+        description = "Read-only physical meter and raw usage observations"
+    ),
+)]
+struct ApiDoc;
+
+struct BearerSecurity;
+
+impl utoipa::Modify for BearerSecurity {
+    fn modify(&self, api: &mut utoipa::openapi::OpenApi) {
+        use utoipa::openapi::security::{
+            HttpAuthScheme, HttpBuilder, SecurityScheme,
+        };
+        let components = api.components.get_or_insert_with(Default::default);
+        components.add_security_scheme(
+            "bearer_auth",
+            SecurityScheme::Http(
+                HttpBuilder::new().scheme(HttpAuthScheme::Bearer).build(),
+            ),
+        );
+    }
+}
+
+/// Contract derived from the actual Rust HTTP handlers and response types.
+pub fn openapi() -> utoipa::openapi::OpenApi {
+    ApiDoc::openapi()
+}
+
+/// The health probe reveals no database or customer information.
+pub fn router(pool: Pool<MySql>) -> Router {
+    Router::new()
+        .route("/healthz", get(healthz))
+        .route("/v1/meters", get(meters))
+        .route("/v1/meters/{id}/stream", get(stream))
+        .with_state(AppState { pool })
+}
+
+/// Enable Swagger UI only for explicitly opted-in development instances.
+/// Deployment must additionally bind to a loopback address.
+pub fn developer_router(pool: Pool<MySql>) -> Router {
+    router(pool).merge(
+        SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi()),
+    )
+}

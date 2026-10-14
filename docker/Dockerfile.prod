@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: MIT
+
+FROM rust:1-bookworm AS builder
+
+WORKDIR /workspace
+
+COPY . .
+
+RUN cargo build \
+    --locked \
+    --release \
+    -p energy-store \
+    --bin energy-store-admin \
+    --bin energy-store-import \
+    --bin energy-api-token \
+    -p energy-api \
+    --bin energy-api
+
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder \
+    /workspace/target/release/energy-store-admin \
+    /usr/local/bin/energy-store-admin
+
+COPY --from=builder \
+    /workspace/target/release/energy-store-import \
+    /usr/local/bin/energy-store-import
+
+COPY --from=builder \
+    /workspace/target/release/energy-api-token \
+    /usr/local/bin/energy-api-token
+
+COPY --from=builder \
+    /workspace/target/release/energy-api \
+    /usr/local/bin/energy-api
+
+COPY docker/engy-api-prod-ep.sh \
+    /usr/local/bin/engy-api-prod-ep
+
+COPY docker/energy-store-import-prod-entrypoint.sh \
+    /usr/local/bin/energy-store-import-prod-entrypoint
+
+COPY docker/es-adm-prod.sh \
+    /usr/local/bin/es-adm-prod
+
+RUN chmod 0755 \
+    /usr/local/bin/energy-store-admin \
+    /usr/local/bin/energy-store-import \
+    /usr/local/bin/energy-api-token \
+    /usr/local/bin/energy-api \
+    /usr/local/bin/engy-api-prod-ep \
+    /usr/local/bin/energy-store-import-prod-entrypoint \
+    /usr/local/bin/es-adm-prod
+
+ENTRYPOINT ["/usr/local/bin/es-adm-prod"]

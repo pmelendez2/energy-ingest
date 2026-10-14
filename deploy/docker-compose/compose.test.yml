@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: MIT
+
+services:
+  test:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.dev
+      args:
+        RUST_IMAGE: ${ENGY_TEST_RUST_IMAGE:-rust:1-bookworm}
+    working_dir: /workspace/repo/${ENGY_PROJECT_RELATIVE:-.}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      CARGO_HOME: /cargo
+      CARGO_TARGET_DIR: /target
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /workspace/repo
+      ENGY_DB_ADMIN_URL: ${ENGY_DB_ADMIN_URL}
+      ENGY_DB_URL: ${ENGY_DB_URL}
+      ENGY_T_DB_URL: ${ENGY_T_DB_URL}
+      ENGY_SKIP_FMT: ${ENGY_SKIP_FMT:-0}
+    volumes:
+      - ${ENGY_REPO_ROOT}:/workspace/repo
+      - cargo-home:/cargo
+      - cargo-target:/target
+      - /etc/localtime:/etc/localtime:ro
+    command:
+      - bash
+      - -c
+      - |
+        command -v cargo
+        cargo --version
+        exec ./scripts/verify.sh
+    networks:
+      - test
+
+  mariadb:
+    image: ${ENGY_TEST_DB_IMAGE:-mariadb:lts}
+    environment:
+      MARIADB_DATABASE: ${ENGY_TEST_DB_NAME}
+      MARIADB_USER: ${ENGY_TEST_DB_USER}
+      MARIADB_PASSWORD_FILE: /run/secrets/energy_test_db_pwd
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/energy_test_db_root_pwd
+    secrets:
+      - energy_test_db_pwd
+      - energy_test_db_root_pwd
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - --connect
+        - --innodb_initialized
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 60s
+    networks:
+      - test
+
+volumes:
+  cargo-home:
+  cargo-target:
+
+networks:
+  test:
+
+secrets:
+  energy_test_db_pwd:
+    file: ${ENGY_TEST_DB_PWD_FILE}
+  energy_test_db_root_pwd:
+    file: ${ENGY_TEST_DB_ROOT_PWD_FILE}

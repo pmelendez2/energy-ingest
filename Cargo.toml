@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+
+[workspace]
+members = [
+    "crates/energy-store",
+    "crates/energy-api",
+    "crates/gb",
+    "crates/gb_profile",
+    "crates/fixture_privacy",
+]
+resolver = "3"

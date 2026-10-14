@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT
+
+# Maximum preferred source-code line width.
+max_width = 80
+
+# Use standard Rust indentation.
+hard_tabs = false
+tab_spaces = 4
+
+# Use the default stable Rust formatting rules.
+use_small_heuristics = "Max"
+
+# Project Rust edition.
+edition = "2024"

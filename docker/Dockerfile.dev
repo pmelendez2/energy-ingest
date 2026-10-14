@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+
+ARG RUST_IMAGE=rust:1-bookworm
+FROM ${RUST_IMAGE}
+
+RUN rustup component add rustfmt clippy
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        default-mysql-client \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+CMD ["sleep", "infinity"]

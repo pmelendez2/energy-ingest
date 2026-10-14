@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: MIT
+# AI-assisted: ChatGPT / GPT-6; 2026-10-08.
+name: gb_profile release
+
+on:
+  push:
+    tags:
+      - 'gb_profile-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify version tag and build
+        env:
+          GB_PROFILE_OFFICIAL_RELEASE: '1'
+        run: |
+          set -euo pipefail
+          bash scripts/release_gb_profile.sh
+      - name: Check executable version
+        run: |
+          ./target/release/gb_profile --version | grep '(stable)'
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gb_profile-linux-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gb_profile-linux-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            release-assets/* --verify-tag --generate-notes

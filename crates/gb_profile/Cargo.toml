@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT
+# AI-assisted: ChatGPT / GPT-6; 2026-10-08.
+
+[package]
+name = "gb_profile"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+build = "build.rs"
+
+[dependencies]
+gb = { path = "../gb" }
+sha2 = "0.10"
+zip = { version = "0.6.6", default-features = false, features = ["deflate"] }

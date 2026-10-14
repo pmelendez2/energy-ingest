@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT
+#
+
+# Example energy_ingest configuration.
+#
+# Do not place passwords, OAuth client secrets, access tokens, or refresh
+# tokens in this file.
+
+[storage]
+database = "/var/lib/energy-ingest/energy.db"
+
+[[sources]]
+name = "green-button-files"
+type = "green_button_file"
+inbox = "/var/lib/energy-ingest/inbox"

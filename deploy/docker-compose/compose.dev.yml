@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: MIT
+
+services:
+  dev:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.dev
+      args:
+        RUST_IMAGE: ${ENGY_DEV_RUST_IMAGE:-rust:1-bookworm}
+    working_dir: /workspace/repo/${ENGY_PROJECT_RELATIVE:-.}
+    command:
+      - bash
+      - -c
+      - |
+        exec sleep infinity
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      CARGO_HOME: /cargo
+      CARGO_TARGET_DIR: /target
+      GIT_CONFIG_COUNT: 1
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /workspace/repo
+      ENGY_DB_HOST: mariadb
+      ENGY_DB_NAME: ${ENGY_DB_NAME}
+      ENGY_DB_USER: ${ENGY_DB_USER}
+    secrets:
+      - energy_db_pwd
+    volumes:
+      - ${ENGY_REPO_ROOT:-../..}:/workspace/repo
+      - cargo-home:/cargo
+      - cargo-target:/target
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - dev
+
+  mariadb:
+    image: ${ENGY_DB_IMAGE:-mariadb:lts}
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${ENGY_DB_NAME}
+      MARIADB_USER: ${ENGY_DB_USER}
+      MARIADB_PASSWORD_FILE: /run/secrets/energy_db_pwd
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/energy_db_root_pwd
+    secrets:
+      - energy_db_pwd
+      - energy_db_root_pwd
+    volumes:
+      - energy-db-data:/var/lib/mysql
+      - type: bind
+        source: ./10-runtime-grants.sh
+        target: /docker-entrypoint-initdb.d/10-runtime-grants.sh
+        read_only: true
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - --connect
+        - --innodb_initialized
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    networks:
+      - dev
+
+volumes:
+  cargo-home:
+  cargo-target:
+  energy-db-data:
+
+networks:
+  dev:
+
+secrets:
+  energy_db_pwd:
+    file: ${ENGY_DB_PWD_FILE:-./dev-secrets/energy_db_pwd}
+  energy_db_root_pwd:
+    file: ${ENGY_DB_ROOT_PWD_FILE:-./dev-secrets/energy_db_root_pwd}
