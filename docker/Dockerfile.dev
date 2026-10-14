@@ -3,6 +3,13 @@
 ARG RUST_IMAGE=rust:1-bookworm
 FROM ${RUST_IMAGE}
 
+# Keep identity definitions aligned with the production image.
+# Development/test commands continue to run as root for tooling.
+ARG ENGY_RUN_USER=energy
+ARG ENGY_RUN_GROUP=energy
+ARG ENGY_RUN_UID=10001
+ARG ENGY_RUN_GID=10001
+
 RUN rustup component add rustfmt clippy
 
 RUN apt-get update \
@@ -10,7 +17,21 @@ RUN apt-get update \
         ca-certificates \
         default-mysql-client \
         pkg-config \
+        perl-base \
+    && groupadd \
+        --gid "${ENGY_RUN_GID}" \
+        "${ENGY_RUN_GROUP}" \
+    && useradd \
+        --uid "${ENGY_RUN_UID}" \
+        --gid "${ENGY_RUN_GROUP}" \
+        --home-dir /var/lib/energy-ingest \
+        --create-home \
+        --shell /usr/sbin/nologin \
+        "${ENGY_RUN_USER}" \
     && rm -rf /var/lib/apt/lists/*
+
+ENV ENGY_RUN_USER=${ENGY_RUN_USER}
+ENV ENGY_RUN_GROUP=${ENGY_RUN_GROUP}
 
 WORKDIR /workspace
 

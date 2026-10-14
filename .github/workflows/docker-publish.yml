@@ -37,13 +37,20 @@ jobs:
       - name: Audit image build and privacy boundaries
         run: bash scripts/audit-prod-release.sh energy-ingest:release-check
       - name: Scan production image for critical vulnerabilities
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          image-ref: energy-ingest:release-check
-          format: table
-          exit-code: "1"
-          ignore-unfixed: true
-          severity: CRITICAL
+        run: |
+          docker run --rm \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume trivy-cache:/root/.cache/ \
+            aquasec/trivy:0.65.0 \
+            image \
+            --scanners vuln \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --exit-code 1 \
+            --format table \
+            --image-src docker \
+            energy-ingest:release-check
+
       - name: Validate production runtime and protected secrets
         env:
           ENGY_TEST_IMAGE: energy-ingest:release-check
