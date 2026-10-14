@@ -227,6 +227,17 @@ migrate_database() {
 }
 
 create_missing_local_files() {
+
+    # Prevent accidental replacement of existing database credentials.
+    if volume_exists; then
+        if [ ! -f "$ENV_FILE" ] ||
+           [ ! -s "$DB_SECRET" ] ||
+           [ ! -s "$ROOT_SECRET" ]; then
+            die "Existing database has missing configuration or \
+    credentials. Restore them from backup; do not regenerate."
+        fi
+    fi
+
     mkdir -p "$SECRETS_DIR"
     chmod 700 "$SECRETS_DIR"
 
