@@ -18,22 +18,31 @@ RUN cargo build \
 
 FROM debian:bookworm-slim
 
+# Runtime account identity
+ARG ENGY_RUN_USER=energy
+ARG ENGY_RUN_GROUP=energy
+ARG ENGY_RUN_UID=10001
+ARG ENGY_RUN_GID=10001
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         gosu \
-    && groupadd --gid 10001 energy \
+        perl-base \
+    && groupadd  \
+        --gid "${ENGY_RUN_GID}" \
+        "${ENGY_RUN_GROUP}" \
     && useradd \
-        --uid 10001 \
-        --gid energy \
+        --uid "${ENGY_RUN_UID}" \
+        --gid "${ENGY_RUN_GROUP}" \
         --home-dir /var/lib/energy-ingest \
         --create-home \
         --shell /usr/sbin/nologin \
-        energy \
+        "${ENGY_RUN_USER}" \
     && rm -rf /var/lib/apt/lists/*
 
-ENV ENGY_RUN_USER=energy
-ENV ENGY_RUN_GROUP=energy
+ENV ENGY_RUN_USER=${ENGY_RUN_USER}
+ENV ENGY_RUN_GROUP=${ENGY_RUN_GROUP}
 
 WORKDIR /var/lib/energy-ingest
 
