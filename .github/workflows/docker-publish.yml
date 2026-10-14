@@ -48,6 +48,10 @@ jobs:
         env:
           ENGY_TEST_IMAGE: energy-ingest:release-check
         run: bash scripts/test-prod-runtime.sh
+      - name: Verify sanitized XML import and authenticated API
+        env:
+          ENGY_TEST_IMAGE: energy-ingest:release-check
+        run: bash scripts/test-prod-e2e.sh
   arm64-smoke:
     needs: verify
     runs-on: ubuntu-26.04
