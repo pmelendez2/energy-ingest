@@ -17,4 +17,4 @@ tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
-toml = "0.9"
+toml = "1.1"
