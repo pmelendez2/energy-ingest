@@ -112,6 +112,71 @@ docker run --rm --network "$NET" \
     --entrypoint /usr/local/bin/engy-st-imp-prod-ep \
     "$IMAGE" --help >/dev/null
 
+echo 'Testing production API health and authentication boundary ...'
+docker run -d --name "$API" --network "$NET" \
+    --mount "$app_mount" \
+    -e ENGY_DB_NAME=energy_ingest_runtime_test \
+    -e ENGY_DB_USER=energy_ingest_runtime_test \
+    -e ENGY_API_LISTEN=0.0.0.0:8080 \
+    --entrypoint /usr/local/bin/engy-api-prod-ep \
+    "$IMAGE" >/dev/null
+
+# The Rust API must be PID 1 and must not be root.
+api_ready=false
+for _ in $(seq 1 30); do
+    if ! docker inspect -f '{{.State.Running}}' "$API" \
+        | grep -qx true; then
+        echo 'ERROR: API container exited unexpectedly.' >&2
+        docker logs --tail 30 "$API" >&2
+        exit 1
+    fi
+    if docker exec "$API" sh -c \
+        'test -r /proc/1/status' >/dev/null 2>&1; then
+        api_ready=true
+        break
+    fi
+    sleep 1
+done
+[ "$api_ready" = true ] || {
+    echo 'ERROR: API process did not start.' >&2
+    exit 1
+}
+api_uid="$(docker exec "$API" awk '/^Uid:/ {print $2}' \
+    /proc/1/status)"
+if [ -z "$api_uid" ] || [ "$api_uid" -eq 0 ]; then
+    echo 'ERROR: API process is root or UID is unknown.' >&2
+    exit 1
+fi
+
+# Query over the isolated Docker network without opening a host port.
+# A missing bearer token must never allow access to customer data.
+HTTP_IMAGE="${ENGY_TEST_HTTP_IMAGE:-curlimages/curl:8.16.0}"
+api_http() {
+    docker run --rm --network "$NET" \
+        "$HTTP_IMAGE" --silent --output /dev/null \
+        --write-out '%{http_code}' --max-time 5 "$1"
+}
+ready=false
+for _ in $(seq 1 30); do
+    code="$(api_http "http://$API:8080/healthz")" || code='000'
+    if [ "$code" = 204 ]; then
+        ready=true
+        break
+    fi
+    sleep 1
+done
+[ "$ready" = true ] || {
+    echo 'ERROR: API health endpoint did not return 204.' >&2
+    docker logs --tail 30 "$API" >&2
+    exit 1
+}
+code="$(api_http "http://$API:8080/v1/meters")"
+[ "$code" = 401 ] || {
+    echo "ERROR: unauthenticated meters request returned $code." >&2
+    exit 1
+}
+echo "PASS: API health 204, unauthorized request 401, UID $api_uid"
+
 echo 'Testing default identity and root rejection ...'
 docker run --rm --network none \
     "$IMAGE" --help >/dev/null
