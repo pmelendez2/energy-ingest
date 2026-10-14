@@ -110,8 +110,8 @@ jobs:
           version="${GITHUB_REF_NAME#energy-ingest-v}"
           {
             echo 'tags<<EOF'
-            echo "pmelendez2/energy-ingest:$version"
-            echo "pmelendez2/energy-ingest:sha-${GITHUB_SHA:0:12}"
+            echo "pmelendez2/gb-energy-ingest:$version"
+            echo "pmelendez2/gb-energy-ingest:sha-${GITHUB_SHA:0:12}"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
       - name: Build and publish amd64 and arm64
@@ -130,4 +130,4 @@ jobs:
       - name: Record image digest
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
-        run: echo "pmelendez2/energy-ingest@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "pmelendez2/gb-energy-ingest@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
