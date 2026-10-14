@@ -484,7 +484,7 @@ Validated operating systems, architectures, and portability checks are recorded
 in:
 
 ```text
-TESTED_ENVIRONMENTS.md
+docs/TESTED_ENVIRONMENTS.md
 ```
 
 Update that file when a development or release-validation workflow is exercised

@@ -25,7 +25,7 @@ Environment claims use these project terms:
 
 Current and release-specific tested environments are recorded in:
 
-`docs/development/TESTED_ENVIRONMENTS.md`
+`docs/TESTED_ENVIRONMENTS.md`
 
 The Git repository is the authoritative source for project-controlled source, tests, migrations, documentation, ADRs, scripts, CI configuration, and safe-to-commit configuration.
 
