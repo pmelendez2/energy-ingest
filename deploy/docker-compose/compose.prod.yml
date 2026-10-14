@@ -33,9 +33,6 @@ services:
 
   # One-shot migration job. Never runs against a development database.
   migrate:
-    build:
-      context: ../..
-      dockerfile: docker/Dockerfile.prod
     image: ${ENGY_APP_IMAGE:?Set ENGY_APP_IMAGE in .env.prod}
     restart: "no"
     command: ["database", "bootstrap"]
@@ -93,9 +90,6 @@ services:
 
   admin:
     profiles: ["maintenance"]
-    build:
-      context: ../..
-      dockerfile: docker/Dockerfile.prod
     image: ${ENGY_APP_IMAGE:?Set ENGY_APP_IMAGE in .env.prod}
     restart: "no"
     environment:
