@@ -19,8 +19,20 @@ RUN cargo build \
 FROM debian:bookworm-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        gosu \
+    && groupadd --gid 10001 energy \
+    && useradd \
+        --uid 10001 \
+        --gid energy \
+        --home-dir /var/lib/energy-ingest \
+        --create-home \
+        --shell /usr/sbin/nologin \
+        energy \
     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/lib/energy-ingest
 
 COPY --from=builder \
     /workspace/target/release/energy-store-admin \
@@ -41,8 +53,8 @@ COPY --from=builder \
 COPY docker/engy-api-prod-ep.sh \
     /usr/local/bin/engy-api-prod-ep
 
-COPY docker/energy-store-import-prod-entrypoint.sh \
-    /usr/local/bin/energy-store-import-prod-entrypoint
+COPY docker/engy-st-imp-prod-ep.sh \
+    /usr/local/bin/engy-st-imp-prod-ep
 
 COPY docker/es-adm-prod.sh \
     /usr/local/bin/es-adm-prod
@@ -53,7 +65,7 @@ RUN chmod 0755 \
     /usr/local/bin/energy-api-token \
     /usr/local/bin/energy-api \
     /usr/local/bin/engy-api-prod-ep \
-    /usr/local/bin/energy-store-import-prod-entrypoint \
+    /usr/local/bin/engy-st-imp-prod-ep \
     /usr/local/bin/es-adm-prod
 
 ENTRYPOINT ["/usr/local/bin/es-adm-prod"]

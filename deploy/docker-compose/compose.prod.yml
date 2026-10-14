@@ -50,7 +50,7 @@ services:
   import:
     profiles: ["manual"]
     image: ${ENGY_APP_IMAGE:?Set ENGY_APP_IMAGE in .env.prod}
-    entrypoint: ["/usr/local/bin/energy-store-import-prod-entrypoint"]
+    entrypoint: ["/usr/local/bin/engy-st-imp-prod-ep"]
     restart: "no"
     depends_on:
       mariadb:

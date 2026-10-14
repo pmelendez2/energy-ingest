@@ -17,4 +17,4 @@ case "$pwd" in
     *[!A-Fa-f0-9]*|'') echo 'invalid database secret' >&2; exit 1;;
 esac
 export ENGY_DB_URL="mysql://${ENGY_DB_USER}:${pwd}@mariadb:3306/${ENGY_DB_NAME}"
-exec /usr/local/bin/energy-store-import "$@"
+exec gosu energy:energy /usr/local/bin/energy-store-import "$@"

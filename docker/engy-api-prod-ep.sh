@@ -26,4 +26,4 @@ case "$password" in
 esac
 export ENGY_DB_URL="mysql://${ENGY_DB_USER}:${password}@mariadb:3306/${ENGY_DB_NAME}"
 unset password
-exec /usr/local/bin/energy-api
+exec gosu energy:energy /usr/local/bin/energy-api

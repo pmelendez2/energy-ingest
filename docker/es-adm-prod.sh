@@ -20,7 +20,7 @@ esac
 
 if [ "${1:-}" = '--help' ] || [ "${1:-}" = '-h' ] ||
    [ "$#" -eq 0 ]; then
-    exec /usr/local/bin/energy-store-admin --help
+    exec gosu energy:energy /usr/local/bin/energy-store-admin --help
 fi
 
 case "${1:-} ${2:-}" in
@@ -47,7 +47,7 @@ case "${1:-} ${2:-}" in
         ;;
     *)
         # Let the Rust executable report invalid syntax without secrets.
-        exec /usr/local/bin/energy-store-admin "$@"
+        exec gosu energy:energy /usr/local/bin/energy-store-admin "$@"
         ;;
 esac
 
@@ -72,6 +72,6 @@ fi
 unset password url
 if [ "${1:-}" = "api-token" ]; then
     shift
-    exec /usr/local/bin/energy-api-token "$@"
+    exec gosu energy:energy /usr/local/bin/energy-api-token "$@"
 fi
-exec /usr/local/bin/energy-store-admin "$@"
+exec gosu energy:energy /usr/local/bin/energy-store-admin "$@"
