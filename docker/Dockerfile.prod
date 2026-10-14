@@ -32,6 +32,9 @@ RUN apt-get update \
         energy \
     && rm -rf /var/lib/apt/lists/*
 
+ENV ENGY_RUN_USER=energy
+ENV ENGY_RUN_GROUP=energy
+
 WORKDIR /var/lib/energy-ingest
 
 COPY --from=builder \

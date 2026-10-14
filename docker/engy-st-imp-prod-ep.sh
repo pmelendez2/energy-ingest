@@ -2,6 +2,19 @@
 # SPDX-License-Identifier: MIT
 # Production CLI wrapper: credentials remain in Docker secret files.
 set -eu
+
+# Require an unprivileged application identity.
+: "${ENGY_RUN_USER:?Runtime user is required}"
+: "${ENGY_RUN_GROUP:?Runtime group is required}"
+
+run_uid=$(gosu \
+    "${ENGY_RUN_USER}:${ENGY_RUN_GROUP}" id -u)
+
+if [ "$run_uid" -eq 0 ]; then
+    echo "ERROR: Application must not run as root" >&2
+    exit 1
+fi
+
 : "${ENGY_DB_NAME:?database name is required}"
 : "${ENGY_DB_USER:?database user is required}"
 case "$ENGY_DB_NAME" in
@@ -17,4 +30,5 @@ case "$pwd" in
     *[!A-Fa-f0-9]*|'') echo 'invalid database secret' >&2; exit 1;;
 esac
 export ENGY_DB_URL="mysql://${ENGY_DB_USER}:${pwd}@mariadb:3306/${ENGY_DB_NAME}"
-exec gosu energy:energy /usr/local/bin/energy-store-import "$@"
+exec "${ENGY_RUN_USER}:${ENGY_RUN_GROUP}" \
+     /usr/local/bin/energy-store-import "$@"

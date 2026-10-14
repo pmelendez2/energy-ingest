@@ -10,6 +10,24 @@
 # Registration operations use restricted application credentials.
 set -eu
 
+# Require an unprivileged application identity.
+: "${ENGY_RUN_USER:?Runtime user is required}"
+: "${ENGY_RUN_GROUP:?Runtime group is required}"
+
+run_uid=$(gosu \
+    "${ENGY_RUN_USER}:${ENGY_RUN_GROUP}" id -u)
+
+if [ "$run_uid" -eq 0 ]; then
+    echo "ERROR: Application must not run as root" >&2
+    exit 1
+fi
+
+if [ "${1:-}" = '--help' ] || [ "${1:-}" = '-h' ] ||
+   [ "$#" -eq 0 ]; then
+    exec gosu "${ENGY_RUN_USER}:${ENGY_RUN_GROUP}" \
+         /usr/local/bin/energy-store-admin --help
+fi
+
 : "${ENGY_DB_NAME:?database name is required}"
 case "$ENGY_DB_NAME" in
     ''|*[!A-Za-z0-9_]*)
@@ -17,11 +35,6 @@ case "$ENGY_DB_NAME" in
         exit 2
         ;;
 esac
-
-if [ "${1:-}" = '--help' ] || [ "${1:-}" = '-h' ] ||
-   [ "$#" -eq 0 ]; then
-    exec gosu energy:energy /usr/local/bin/energy-store-admin --help
-fi
 
 case "${1:-} ${2:-}" in
     'database bootstrap')
@@ -47,7 +60,8 @@ case "${1:-} ${2:-}" in
         ;;
     *)
         # Let the Rust executable report invalid syntax without secrets.
-        exec gosu energy:energy /usr/local/bin/energy-store-admin "$@"
+        exec gosu "${ENGY_RUN_USER}:${ENGY_RUN_GROUP}" \
+             /usr/local/bin/energy-store-admin "$@"
         ;;
 esac
 
@@ -72,6 +86,8 @@ fi
 unset password url
 if [ "${1:-}" = "api-token" ]; then
     shift
-    exec gosu energy:energy /usr/local/bin/energy-api-token "$@"
+    exec gosu "${ENGY_RUN_USER}:${ENGY_RUN_GROUP}" \
+         /usr/local/bin/energy-api-token "$@"
 fi
-exec gosu energy:energy /usr/local/bin/energy-store-admin "$@"
+exec gosu "${ENGY_RUN_USER}:${ENGY_RUN_GROUP}" \
+     /usr/local/bin/energy-store-admin "$@"
