@@ -34,6 +34,16 @@ jobs:
         run: |
           bash scripts/check-prod-image.sh \
             energy-ingest:release-check
+      - name: Audit image build and privacy boundaries
+        run: bash scripts/audit-prod-release.sh energy-ingest:release-check
+      - name: Scan production image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: energy-ingest:release-check
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL
       - name: Validate production runtime and protected secrets
         env:
           ENGY_TEST_IMAGE: energy-ingest:release-check
