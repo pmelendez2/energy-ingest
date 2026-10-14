@@ -219,10 +219,10 @@ wait_healthy() {
 }
 
 migrate_database() {
-    # Compose builds the admin image and runs SQLx migrations before
-    # any caller is instructed to import data. Safe on repeat runs.
+    # Pull the versioned application image; never build production from
+    # local source. Migrations are safe on repeat runs.
     printf 'Applying and verifying production schema...\n'
-    "${COMPOSE[@]}" run --rm --build --no-deps \
+    "${COMPOSE[@]}" run --rm --pull always --no-deps \
         migrate database bootstrap
 }
 
@@ -289,7 +289,7 @@ refresh_containers() {
 
 Refresh application containers
 
-This rebuilds/recreates the Compose service definition while preserving:
+This recreates the Compose service using published images, preserving:
 
   .env.prod
   production credentials

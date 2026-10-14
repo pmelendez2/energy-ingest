@@ -36,7 +36,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/Dockerfile.prod
-    image: energy-ingest-admin:local
+    image: ${ENGY_APP_IMAGE:?Set ENGY_APP_IMAGE in .env.prod}
     restart: "no"
     command: ["database", "bootstrap"]
     depends_on:
@@ -52,7 +52,7 @@ services:
   # Operator-only import job; not a public web/API service.
   import:
     profiles: ["manual"]
-    image: energy-ingest-admin:local
+    image: ${ENGY_APP_IMAGE:?Set ENGY_APP_IMAGE in .env.prod}
     entrypoint: ["/usr/local/bin/energy-store-import-prod-entrypoint"]
     restart: "no"
     depends_on:
@@ -74,7 +74,7 @@ services:
   # Read-only HTTP API. Host loopback-only by default.
   api:
     profiles: ["api"]
-    image: energy-ingest-admin:local
+    image: ${ENGY_APP_IMAGE:?Set ENGY_APP_IMAGE in .env.prod}
     entrypoint: ["/usr/local/bin/engy-api-prod-ep"]
     restart: unless-stopped
     depends_on:
@@ -96,7 +96,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/Dockerfile.prod
-    image: energy-ingest-admin:local
+    image: ${ENGY_APP_IMAGE:?Set ENGY_APP_IMAGE in .env.prod}
     restart: "no"
     environment:
       ENGY_DB_NAME: ${ENGY_DB_NAME}

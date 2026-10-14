@@ -41,8 +41,6 @@ require_environment() {
     [ -f "$ROOT_SECRET" ] ||
         die "Missing production administrative database credential."
 
-    docker image inspect energy-ingest-admin:local >/dev/null 2>&1 ||
-        die "Missing energy-ingest-admin:local. Build the admin image first."
 }
 
 mariadb_health() {
@@ -78,6 +76,7 @@ main() {
 
     "${COMPOSE[@]}" run \
         --rm \
+        --pull always \
         --no-deps \
         migrate \
         database bootstrap
