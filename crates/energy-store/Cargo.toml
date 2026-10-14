@@ -8,7 +8,7 @@ edition = "2024"
 [dependencies]
 base64 = "0.22.1"
 getrandom = "0.4.3"
-sha2 = "0.10.9"
+sha2 = "0.11.0"
 chrono = "0.4"
 gb = { path = "../gb" }
 sqlx = { version = "0.9.0", default-features = false, features = ["mysql", "migrate", "macros", "runtime-tokio", "chrono"] }
