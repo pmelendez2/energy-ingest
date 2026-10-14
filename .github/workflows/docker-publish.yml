@@ -37,7 +37,7 @@ jobs:
       - name: Audit image build and privacy boundaries
         run: bash scripts/audit-prod-release.sh energy-ingest:release-check
       - name: Scan production image for critical vulnerabilities
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           image-ref: energy-ingest:release-check
           format: table
