@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+bash "$root/scripts/check-publication.sh"
+
+# An explicit terminal confirmation is required for any manual push.
+if [[ ! -r /dev/tty ]]; then
+  echo 'Push blocked: no interactive confirmation terminal.' >&2
+  exit 1
+fi
+printf 'This push may expose code and history publicly. Type PUBLISH: ' \
+  > /dev/tty
+IFS= read -r answer < /dev/tty
+[[ "$answer" == PUBLISH ]] || {
+  echo 'Push cancelled.' >&2
+  exit 1
+}

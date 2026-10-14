@@ -1,28 +1,33 @@
 # SPDX-License-Identifier: MIT
-#
-
 name: CI
-
 on:
   push:
+    branches: [main]
   pull_request:
-
+permissions:
+  contents: read
 jobs:
   rust:
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-
+      - uses: Swatinem/rust-cache@v2
       - name: Format
         run: cargo fmt --all -- --check
-
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-      - name: Test
+      - name: Unit and documentation tests
         run: cargo test --workspace --all-features
+      - name: ADR conformance
+        run: python3 scripts/check_adr_conformance.py
+  isolated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify with isolated MariaDB
+        run: bash deploy/docker-compose/test.sh
