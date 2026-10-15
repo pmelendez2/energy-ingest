@@ -10,11 +10,11 @@ Windows/WSL2 users should review its unvalidated platform guidance.
 
 ## Published release and prerequisites
 
-The initial production image is
-`docker.io/pmelendez2/gb-energy-ingest:0.1.0` for Linux AMD64 and ARM64.
-The published image is not itself a complete installation bundle.
-The setup scripts and Compose files must also be obtained from a
-verified source checkout or published release archive.
+A versioned production image is published at
+`docker.io/pmelendez2/gb-energy-ingest` for Linux AMD64 and ARM64.
+Obtain the matching official installation ZIP and checksum from
+[GitHub Releases](https://github.com/pmelendez2/energy_ingest/releases).
+The extracted `.env.prod.example` pins the corresponding image tag.
 
 Follow [Linux installation](INSTALL_LINUX.md) or
 [Windows guidance](INSTALL_WINDOWS.md) first. Windows/WSL2 installation

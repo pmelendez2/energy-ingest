@@ -144,3 +144,38 @@ jobs:
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
         run: echo "pmelendez2/gb-energy-ingest@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Package customer installation files
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#energy-ingest-v}"
+          bash scripts/package-prod-release.sh "$version" dist
+      - name: Publish official GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#energy-ingest-v}"
+          archive="dist/energy-ingest-prod-${version}.zip"
+          checksum="${archive}.sha256"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "ERROR: GitHub Release already exists." >&2
+            echo "Refusing to replace published assets." >&2
+            exit 1
+          fi
+
+          gh release create "$GITHUB_REF_NAME" \
+            "$archive" "$checksum" \
+            --verify-tag \
+            --title "Energy Ingest ${version}" \
+            --notes "Production Docker image: docker.io/pmelendez2/gb-energy-ingest:${version}. Download the ZIP and checksum, verify with SHA-256, extract, and follow docs/INSTALL_LINUX.md. Linux amd64 and arm64; Home Assistant integration is planned."

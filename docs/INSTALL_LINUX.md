@@ -14,30 +14,29 @@ The account running setup must be authorized to operate Docker. Docker
 access is privileged; follow Docker's security guidance. No host Rust
 compiler or MariaDB server is required.
 
-## Obtain the installation files
+## Obtain the official release archive
 
-Release `energy-ingest-v0.1.0` identifies source commit `41798b7`.
-The published application image is
-`docker.io/pmelendez2/gb-energy-ingest:0.1.0` (AMD64/ARM64).
-
-The installation source is hosted in the
-[GitHub repository](https://github.com/pmelendez2/energy_ingest).
-Use a Git checkout to obtain the exact Compose and script files:
+Open the [GitHub Releases page](https://github.com/pmelendez2/energy_ingest/releases)
+and choose the version you intend to install. The release must provide an
+`energy-ingest-prod-VERSION.zip` file and its `.sha256` checksum.
+For example, for release `0.1.2`, run these commands on your **Linux host**:
 
 ```bash
-git clone https://github.com/pmelendez2/energy_ingest.git
-cd energy_ingest
-git checkout energy-ingest-v0.1.0
+version=0.1.2
+base="https://github.com/pmelendez2/energy_ingest/releases/download/energy-ingest-v${version}"
+mkdir -p "$HOME/energy-ingest-prod"
+cd "$HOME/energy-ingest-prod"
+curl -fLO "$base/energy-ingest-prod-${version}.zip"
+curl -fLO "$base/energy-ingest-prod-${version}.zip.sha256"
+sha256sum -c "energy-ingest-prod-${version}.zip.sha256"
+unzip "energy-ingest-prod-${version}.zip"
 ```
 
-This fetches source as well as the scripts, but customers do not need
-to build or compile it. The Compose production template selects the
-published image. Verify the repository URL and public tag before
-relying on this method; their accessibility was not live-checked in
-this static documentation review.
-
-No separate installation ZIP is asserted as published here. A future
-release may provide a smaller, verified installation bundle.
+If any download or checksum step fails, **stop**. Do not use a
+privately assembled archive or substitute source files. The archive
+contains production scripts, Compose configuration, and documentation;
+Docker Compose subsequently pulls the version-matched image from Docker Hub.
+No Git checkout or Rust toolchain is required.
 
 ## Initialize and verify
 
