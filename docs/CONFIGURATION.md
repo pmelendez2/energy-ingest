@@ -13,6 +13,8 @@ The standard setup creates the necessary configuration and credentials.
 You do not need to install Rust, create database accounts manually,
 or export database connection strings in your shell.
 
+**Intended Audience:** Users and operators configuring an Energy Usage installation.
+
 ## Prerequisites
 
 - Docker Engine and Docker Compose v2.
@@ -38,6 +40,7 @@ to enter in your shell.
 
 | Setting | Purpose | Example | Normal user action |
 | --- | --- | --- | --- |
+| `ENGY_APP_IMAGE` | Production application image | `docker.io/pmelendez2/gb-energy-ingest:0.1.0` | Keep at a verified release |
 | `ENGY_DB_IMAGE` | MariaDB image | `mariadb:lts` | None |
 | `ENGY_DB_NAME` | Database name | `energy_ingest` | None |
 | `ENGY_DB_USER` | Database application account | `energy_ingest` | None |

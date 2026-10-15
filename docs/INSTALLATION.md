@@ -2,124 +2,113 @@
 
 # Install Energy Usage
 
-Energy Usage stores electricity and gas usage readings from Green Button
-XML files in a local database. This guide explains how to install the
-Docker deployment, register a utility, and import your files.
+**Purpose:** Guide customers through production setup, utility registration,
+and Green Button XML import without requiring a Rust toolchain.
 
-## 1. Choose your operating system
+**Intended Audience:** Linux customers and installation administrators.
+Windows/WSL2 users should review its unvalidated platform guidance.
 
-Follow the setup instructions for your computer:
+## Published release and prerequisites
 
-- [Linux installation](INSTALL_LINUX.md)
-- [Windows installation](INSTALL_WINDOWS.md)
+The initial production image is
+`docker.io/pmelendez2/gb-energy-ingest:0.1.0` for Linux AMD64 and ARM64.
+The published image is not itself a complete installation bundle.
+The setup scripts and Compose files must also be obtained from a
+verified source checkout or published release archive.
 
-Both guides use Docker Compose to run Energy Usage and its MariaDB database.
-The installation package includes the configuration and setup scripts.
-You do not need to install Rust, use Git, or create database tables manually.
+Follow [Linux installation](INSTALL_LINUX.md) or
+[Windows guidance](INSTALL_WINDOWS.md) first. Windows/WSL2 installation
+has not been validated for this release. No host Rust installation is
+needed to run the production image.
 
-## 2. Start Energy Usage
+Run the commands below **from the project root**. Scripts in `scripts/`
+locate their Compose configuration automatically. The `.sh` scripts have
+Bash shebangs; use direct execution when their executable bits are retained.
 
-Open a terminal as described in your operating-system guide. From the
-installation package's `deploy/docker-compose` directory, run:
-
-```bash
-bash setup-prod.sh
-```
-
-Follow the prompts. The setup creates local database credentials,
-initializes the database, and starts the database service. Existing
-stored data is preserved during normal startup; review any prompt
-about resetting or removing data carefully.
-
-Check its status with:
+## 1. Set up the database
 
 ```bash
-bash verify-prod.sh
+./scripts/setup-prod.sh
+./scripts/verify-prod.sh
 ```
 
-For details about storage, credentials, and maintenance, see
-[Production Database](PRODUCTION_DATABASE.md).
+The interactive setup prepares credentials and starts MariaDB and the
+schema migration service. Normal setup preserves existing database data.
+Review any recreate/remove prompt carefully: those operations can delete data.
+XML exports are not needed for initial setup.
 
-## 3. Download utility XML files when convenient
+## 2. Store Green Button XML on the host
 
-You can download XML before installation or after installation.
-No XML files are required to start an empty Energy Usage database.
-
-## 4. Keep your utility XML files
-
-Sign in to your electricity or gas provider's website and download
-available Green Button XML usage exports. Keep a copy of each export in
-a private folder on your computer.
-
-The default import folder is:
+Download Green Button XML exports from your utility provider and store
+copies privately. The **default host operating-system directory**, relative
+to the project checkout or extracted installation directory, is:
 
 ```text
 deploy/docker-compose/private-imports/
 ```
 
-You may instead use any folder accessible to Docker. You do not need to
-create a separate directory for each XML download. Imports read the
-source XML without changing or deleting it.
-
-Retained XML files allow usage readings to be imported again if needed.
-A database backup additionally preserves registration information,
-import history, and other records that may not be recoverable from XML.
-
-## 5. Register your utility
-
-Once you are ready to import XML files, run:
+`./scripts/setup-prod.sh` creates this directory during initialization,
+so no manual directory creation is normally required. To open it from a
+terminal at the project root:
 
 ```bash
-bash register-prod.sh
+cd deploy/docker-compose/private-imports
+pwd
 ```
 
-Enter the utility name and an import source label, for example
-**SDG&E** and **Manual XML Download**. The application records an
-internal source identifier. You do not normally need to enter it.
+Move or copy your downloaded `.xml` files into that host folder using
+your preferred file manager or standard file copy operation. Return to
+the project root before running the commands below. The import script
+uses a read-only Docker container mount for the selected host folder;
+it does not modify or delete the originals.
 
-## 6. Import your usage data
+You may alternatively use `--import-dir` with an absolute host path,
+or configure `ENGY_IMPORT_DIR` in `deploy/docker-compose/.env.prod`.
+The script resolves relative paths from `deploy/docker-compose/`, not
+from your shell's current directory. See [Configuration](CONFIGURATION.md).
 
-Downloaded XML files are optional during installation. You can import
-now or return to this step later.
-
-To preview all XML files in your preferred directory:
+## 3. Register an acquisition source
 
 ```bash
-bash import-prod.sh \
-  --import-dir "$HOME/energy_usage/data" \
-  --file "*.xml" \
-  --list-files
+./scripts/register-prod.sh
 ```
 
-Remove `--list-files` to import them. Omit `--import-dir` to use the
-configured default. To select one file, use its name instead of
-`"*.xml"`.
+Follow the prompts to identify the utility and the source of the XML
+export. Retain the returned source ID if you use more than one source.
 
-If there is exactly one registered acquisition source, Energy Usage
-selects it automatically. For multiple sources, specify
-`--source-id "<SOURCE_ID>"` using the ID shown at registration. Only
-combine files obtained through the same acquisition source.
+## 4. Preview and import XML files
 
-Files are read without modification. Overlapping Green Button
-resources must not be summed before logical stream validation.
+From the **project root**:
 
-## 7. Connect Home Assistant
+```bash
+./scripts/import-prod.sh --file '*.xml' --list-files
+./scripts/import-prod.sh --file '*.xml'
+```
 
-Energy Usage and Home Assistant have separate responsibilities: Energy
-Usage stores and manages usage readings, while Home Assistant displays
-them through its integration. The database installation described here
-does not itself install Home Assistant entities or connect directly to
-Home Assistant.
+To use a different host directory, add:
 
-When configuring the Home Assistant integration, use the Energy Usage
-application's authenticated API rather than MariaDB credentials. Do not
-expose the database service directly to Home Assistant or the internet.
+```text
+--import-dir /absolute/host/path
+```
 
-## Configuration and help
+A single registered acquisition source is selected automatically. If
+there are multiple sources, pass `--source-id ID`. Do not combine exports
+from different acquisition sources under one ID. Keep XML exports private;
+never attach raw customer data to public support requests.
 
-See [Configuration](CONFIGURATION.md) for import directory and other
-supported settings. See [Production Database](PRODUCTION_DATABASE.md)
-for service responsibilities, persistent storage, and recovery guidance.
+## 5. Verify and maintain
 
-Keep utility XML exports and generated credential files private. Do not
-include them in public support requests.
+```bash
+./scripts/verify-prod.sh
+```
+
+See [Production Database](PRODUCTION_DATABASE.md) for secrets, storage,
+backups, and maintenance. See [Command Reference](SCRIPT_COMMANDS.md)
+for additional operations.
+
+## Planned: Home Assistant integration
+
+A separate `ha_energy_usage` Home Assistant integration is planned.
+It is **not** part of this validated installation procedure. The planned
+integration will use the application's authenticated API, not direct
+MariaDB access. Do not expose MariaDB to Home Assistant or the internet.

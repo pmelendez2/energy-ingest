@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Sanitized XML-to-API release verification
 
+**Purpose:** Describe the release E2E check and its limits.
+
+**Intended Audience:** Release maintainers and developers.
+
 Run `scripts/test-prod-e2e.sh` using the freshly built production image.
 The script generates disposable MariaDB credentials and a disposable API token,
 imports an approved sanitized SDG&E XML fixture, registers a test physical
@@ -9,7 +13,7 @@ through the authenticated HTTP API.
 
 ```bash
 ENGY_TEST_IMAGE=energy-ingest:release-check \
-  bash scripts/test-prod-e2e.sh
+  ./scripts/test-prod-e2e.sh
 ```
 
 The default test fixture is

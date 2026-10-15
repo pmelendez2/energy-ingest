@@ -16,6 +16,8 @@ authoritative schema definition.
 This command does not create the MariaDB server, database account, or database
 itself. Deployment provisioning remains a separate operational concern.
 
+**Intended Audience:** Developers and database administrators.
+
 ## Command
 
 Run from a development environment with administrative database access:

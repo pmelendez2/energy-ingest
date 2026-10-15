@@ -2,6 +2,12 @@
 
 # EI-TC-0001: Re-import identical source data
 
+## Purpose
+
+Verify identical source re-imports do not create duplicate interval records.
+
+**Intended Audience:** Test authors, developers, and maintainers.
+
 ## Objective
 
 Verify that importing identical energy data more than once does not create

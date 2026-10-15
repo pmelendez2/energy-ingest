@@ -21,6 +21,7 @@ UNIT_OUTPUT="$TEMP_DIR/unit-tests.txt"
 INTEGRATION_OUTPUT="$TEMP_DIR/integration-tests.txt"
 DOC_OUTPUT="$TEMP_DIR/doc-tests.txt"
 ADR_OUTPUT="$TEMP_DIR/adr-conformance.txt"
+MARKDOWN_OUTPUT="$TEMP_DIR/markdown-docs.txt"
 
 cleanup() {
     rm -rf "$TEMP_DIR"
@@ -115,6 +116,10 @@ run_check "ADR conformance" "$ADR_OUTPUT" \
     python3 scripts/check_adr_conformance.py
 adr_result="PASS"
 
+run_check "Markdown documentation" "$MARKDOWN_OUTPUT" \
+    python3 scripts/check-docs.py --strict-metadata
+markdown_result="PASS"
+
 adr_count=$(
     awk -F: '/^ADRs found:/ {
         gsub(/[[:space:]]/, "", $2)
@@ -170,6 +175,7 @@ cat > "$STATUS_FILE" <<EOF
 | Integration tests | \`cargo test --workspace --tests -- --test-threads=1\` | $integration_result |
 | Documentation tests | \`cargo test --workspace --doc\` | $doc_result |
 | ADR conformance | \`python3 scripts/check_adr_conformance.py\` | $adr_result |
+| Markdown docs | \`python3 scripts/check-docs.py --strict-metadata\` | $markdown_result |
 
 ## Test Counts
 
@@ -209,6 +215,7 @@ echo "$timestamp,$branch,$commit,$worktree,$fmt_result,$check_result,$clippy_res
 echo
 printf "Verification passed: %s tests; formatting: %s; ADR errors: %s.\n" \
     "$tests_passed" "$fmt_result" "$adr_errors"
+echo "Markdown documentation: $markdown_result"
 echo "Updated $STATUS_FILE"
 echo "Updated $HISTORY_FILE"
 printf "Verification elapsed: %ss\n" \

@@ -2,11 +2,11 @@
 
 # Green Button XML ingestion: architecture and operation
 
-**Audience:** maintainers and contributors. This is not the homeowner's
+**Intended Audience:** Maintainers and contributors. This is not the homeowner's
 installation guide. **Status:** development implementation; not a released
 production container or Home Assistant integration.
 
-## Purpose and user experience
+## Purpose
 
 A homeowner should be able to install the production `energy-ingest` services
 using a supported container deployment, configure a provider, and upload Green

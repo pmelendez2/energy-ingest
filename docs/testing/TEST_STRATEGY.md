@@ -2,6 +2,10 @@
 
 # Test Strategy
 
+**Purpose:** Describe the project-wide testing approach and boundaries.
+
+**Intended Audience:** Developers, test authors, and maintainers.
+
 Testing is part of the architecture of this project.
 
 The project will use:

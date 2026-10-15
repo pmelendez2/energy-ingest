@@ -2,6 +2,10 @@
 
 # Install on Windows
 
+**Purpose:** Document a potential Docker Desktop/WSL2 installation path.
+
+**Intended Audience:** Windows customers evaluating an unvalidated path.
+
 ## Requirements
 
 Docker Desktop with Linux containers and Compose v2, a supported WSL2
@@ -10,17 +14,25 @@ The supplied setup utilities are Bash scripts: execute them inside
 a WSL2 Linux shell with Docker Desktop integration enabled. Windows
 PowerShell alone cannot execute these scripts directly.
 
+## Release validation status
+
+The `0.1.0` container image includes Linux AMD64 and ARM64 platforms.
+The Windows/WSL2 installation path below is guidance only; it has not
+been validated for this release. See
+[release validation](RELEASE_0_1_0_VALIDATION.md).
+
 ## Installation
 
-1. Download and extract the Energy Usage installation archive.
+1. Obtain the installation files from the verified release source
+   described in [Linux installation](INSTALL_LINUX.md).
 2. Open the extracted project folder from your WSL2 shell. For
    example, Windows `C:\Users\YourName\EnergyUsage` is accessible
    as `/mnt/c/Users/YourName/EnergyUsage` in a typical WSL2 setup.
-3. Change to `deploy/docker-compose` and run:
+3. From the installation root in the WSL2 shell, run:
 
 ```bash
-bash setup-prod.sh
-bash status-prod.sh
+./scripts/setup-prod.sh
+./scripts/verify-prod.sh
 ```
 
 Docker Desktop must be running. Keep production secrets and private
@@ -33,7 +45,7 @@ To import from a user directory, supply a **WSL2-accessible path**.
 For example:
 
 ```bash
-bash import-prod.sh --source-id 42 \
+./scripts/import-prod.sh --source-id 42 \
     --import-dir /mnt/c/Users/YourName/EnergyXML \
     --file usage-export.xml
 ```

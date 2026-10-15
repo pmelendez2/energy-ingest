@@ -2,6 +2,10 @@
 
 # Architecture Conformance
 
+**Purpose:** Index implementation evidence for accepted ADRs.
+
+**Intended Audience:** Maintainers and architecture reviewers.
+
 This document provides a lightweight human-audit index for verifying that the implementation remains consistent with the project's accepted Architecture Decision Records (ADRs).
 
 The ADRs define architectural decisions and constraints. This document does not duplicate those decisions and does not itself establish architectural requirements.
@@ -67,7 +71,7 @@ The index below is intentionally maintained at the ADR level rather than assigni
 | ADR-0021 | `crates/energy-store/src/oauth_authorization.rs`; `crates/energy-store/migrations/0005_create_oauth_authorization.sql`; `crates/energy-store/tests/oauth_authorization.rs`; `crates/energy-store/tests/migration.rs` | Automated + Review |
 | ADR-0022 | `crates/energy-store/migrations/0001_create_ingestion_foundation.sql` through `0005_create_oauth_authorization.sql`; `crates/energy-store/src/interval_reading.rs`; `crates/energy-store/src/retrieval_coverage.rs`; `crates/energy-store/src/oauth_authorization.rs`; `crates/energy-store/tests/migration.rs`; `crates/energy-store/tests/interval_reading.rs`; `crates/energy-store/tests/retrieval_coverage.rs`; `crates/energy-store/tests/oauth_authorization.rs` | Automated + Review |
 | ADR-0023 | Pending | Pending |
-| ADR-0024 | Pending | Pending |
+| ADR-0024 | `crates/energy-store/src/api_client.rs`; `crates/energy-store/tests/api_client_db.rs`; `crates/energy-api/tests/http.rs` | Automated + Review |
 | ADR-0025 | Pending | Pending |
 | ADR-0026 | Pending | Pending |
 | ADR-0027 | Pending | Pending |

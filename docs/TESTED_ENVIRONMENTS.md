@@ -4,6 +4,12 @@
 
 # Tested Environments
 
+## Purpose
+
+Record platforms and workflows with documented verification evidence.
+
+**Intended Audience:** Maintainers, contributors, and release reviewers.
+
 This file records environments in which the current `energy_ingest`
 development and verification workflows have been exercised successfully.
 
@@ -98,11 +104,15 @@ The production schema bootstrap completed repeatedly with:
 Database bootstrap complete: 13 application tables verified.
 ```
 
-The final simplified bootstrap path used:
+The final simplified bootstrap path was executed from the
+`deploy/docker-compose/` directory:
 
 ```bash
 ./bootstrap-prod.sh
 ```
+
+From the repository root, the equivalent invocation is
+`./deploy/docker-compose/bootstrap-prod.sh`.
 
 and did not rebuild the administrative image during each bootstrap run.
 
@@ -193,6 +203,27 @@ homelab-tools as a required parent directory
 a fixed repository clone path
 a fixed CPU architecture
 ```
+
+## 2026-10-14 — Production Docker release 0.1.0
+
+- Source: tag `energy-ingest-v0.1.0`, commit `41798b797380`.
+- Image: `docker.io/pmelendez2/gb-energy-ingest:0.1.0`.
+- Platforms published: `linux/amd64` and `linux/arm64`.
+- Multi-platform digest:
+  `sha256:d0eb788c6342f6b90e1d15a4048889cf2fb44d8f9b832505ca29ea8d18bffb62`.
+- GitHub Actions run `38649034462`: verify, ARM64 QEMU smoke test,
+  and multi-platform publish succeeded.
+- Verification included an isolated database test suite, production
+  runtime and secret checks, critical-CVE Trivy gate, sanitized XML
+  import, and authenticated API query.
+- Raspberry Pi 5 `piha`: successful ARM64 image pull, architecture
+  inspection (`linux/arm64`), and administrative `--help` execution.
+- Limitations: no full MariaDB-backed production deployment was run on
+  `piha`; no Windows/WSL2 or macOS validation is claimed here.
+- Release workflow baseline: 76m 30s; ARM64 QEMU build 33m 17s and
+  multi-platform build/publish 37m 53s.
+
+See [complete 0.1.0 evidence](RELEASE_0_1_0_VALIDATION.md).
 
 ## Release Validation Policy
 

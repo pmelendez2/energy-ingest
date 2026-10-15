@@ -2,6 +2,10 @@
 
 # Test Plan
 
+**Purpose:** Define verification scope, entry criteria, and exit criteria.
+
+**Intended Audience:** Test authors, developers, and release maintainers.
+
 ## Scope
 
 The test plan covers the energy ingestion application, provider adapters,
@@ -45,8 +49,8 @@ Known failures must be documented before release.
 The source of truth for selection behavior is the Rust implementation in
 `crates/energy-store/src/usage_stream.rs` and its executable tests.
 
-- `tests/usage_stream.rs` validates deterministic, in-memory selection.
-- `tests/usage_stream_db.rs` validates physical-meter associations,
+- `crates/energy-store/tests/usage_stream.rs` validates deterministic, in-memory selection.
+- `crates/energy-store/tests/usage_stream_db.rs` validates physical-meter associations,
   accepted revisions, deduplication, overlap rejection, measurement
   compatibility, commodity isolation, and missing-meter handling.
 - Conflicting or incomplete source observations must not yield a

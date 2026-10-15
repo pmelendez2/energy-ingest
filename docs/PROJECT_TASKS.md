@@ -34,17 +34,36 @@ During each review:
 4. remove tasks that are no longer required; and
 5. add newly identified deferred work.
 
+## Completed release checkpoint (2026-10-14)
+
+Production Docker image `0.1.0` was published for AMD64 and ARM64.
+Run `38649034462` passed the security, runtime, XML-to-API, and ARM64
+QEMU release gates. The released image was also smoke-tested natively
+on Raspberry Pi 5 `piha`. See
+[release validation](RELEASE_0_1_0_VALIDATION.md).
+
+CI/CD follow-up: evaluate native ARM64 builds, BuildKit cache reuse,
+and eventually publish-by-digest so tested images are not rebuilt.
+Measure against the baseline 76m 30s, and keep protected-branch and
+Docker Hub publication requirements intact. Production MariaDB-backed
+validation on Pi 5 and Windows/WSL2 validation remain outstanding.
+
 ## Current Work
 
-### Implement end-to-end Green Button ingestion
+### Expand and validate Green Button ingestion coverage
 
-Status: In progress.
+Status: Partially implemented; further coverage and production validation
+remain open. The `0.1.0` release workflow passed a sanitized XML import
+followed by an authenticated API query. That does not establish complete
+coverage of every ingestion case or deployment environment.
 
 Connect the shared Green Button parsing path to the canonical
 `energy-store` persistence API.
 
-The first integration target is the sanitized SDG&E
-`sdge-electric-one-day-hourly.xml` golden fixture.
+The existing release E2E fixture is the approved sanitized SDG&E
+`sdge-electric-one-day-hourly.xml` fixture. The following items are
+coverage requirements to reconcile against current tests, not a claim
+that all are missing.
 
 The implementation must:
 
@@ -60,7 +79,7 @@ The implementation must:
 - run through the normal ephemeral database verification workflow.
 
 The Green Button inspection summary is not the persistence model. The
-`greenbutton` parser exposes normalized records through `GreenButtonDocument`
+`gb` parser exposes normalized records through `GreenButtonDocument`
 so ingestion can pass source data to `energy-store` without coupling persistent
 storage to XML parsing.
 
@@ -111,7 +130,8 @@ control plane or additional service unless a concrete requirement justifies it.
 
 ### Complete formal testing documentation
 
-Status: Deferred until first-release preparation.
+Status: Open documentation-maintenance work. Release `0.1.0` has
+been published; reconcile these documents with implemented test gates.
 
 Review and complete the existing testing documentation, including:
 
@@ -143,7 +163,10 @@ Document operational procedures for:
 
 ### Local API operational details
 
-Status: Deferred until the local API implementation begins.
+Status: Partially implemented. Client authentication and
+administration code exists in `crates/energy-api` and
+`crates/energy-store`; review outstanding rotation, revocation,
+and operational documentation separately.
 
 Define implementation-level details for ADR-0024, including:
 
@@ -186,7 +209,9 @@ Test remains ephemeral. Integration may be semi-persistent.
 
 ### Public repository privacy and security audit
 
-Status: Required before the first public release.
+Status: Recurring audit requirement. Public release `0.1.0` exists;
+retain this audit as a continuing release gate instead of describing
+it as exclusively future pre-publication work.
 
 Review all tracked project content for unnecessary local or private
 infrastructure information.

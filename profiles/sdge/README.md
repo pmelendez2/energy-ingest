@@ -2,6 +2,8 @@
 
 # SDG&E Provider Profile
 
+**Intended Audience:** Profile contributors and maintainers.
+
 ## Purpose and Context
 
 This is the initial Green Button™ regression profile for San Diego Gas &
@@ -37,7 +39,7 @@ all Green Button schemas or formal Green Button Alliance certification.
 From the **`energy_ingest` repository root**:
 
 ```bash
-cargo run -p greenbutton -- validate sdge
+cargo run -p gb_profile -- validate sdge
 bash deploy/docker-compose/test.sh
 ```
 

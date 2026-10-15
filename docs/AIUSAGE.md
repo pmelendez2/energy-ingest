@@ -9,6 +9,8 @@ implementation, testing, documentation, and maintenance of this project.
 
 The goal is transparency for maintainers, contributors, and users.
 
+**Intended Audience:** Maintainers, contributors, and users reviewing AI provenance.
+
 ## General policy
 
 AI-generated or AI-assisted output is not considered authoritative solely
