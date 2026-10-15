@@ -2,6 +2,10 @@
 
 # Green Button™ Provider Profiles
 
+**Purpose:** Define the tested provider-profile workflow.
+
+**Intended Audience:** Profile contributors and maintainers.
+
 ## Why Profiles Exist
 
 **Profiles improve regression coverage; they are not a prerequisite for
@@ -31,8 +35,8 @@ California-specific CCA relationship.
 From the **`energy_ingest` repository root**, developers can run:
 
 ```bash
-cargo run -p greenbutton -- list
-cargo run -p greenbutton -- validate-all
+cargo run -p gb_profile -- list
+cargo run -p gb_profile -- validate-all
 ```
 
 A standalone executable requires neither Cargo nor a repository checkout.

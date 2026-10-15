@@ -2,15 +2,21 @@
 
 # Verify an Energy Usage installation
 
+## Purpose
+
+Explain how to check an installed Energy Usage deployment.
+
+**Intended Audience:** Users and operators troubleshooting an installation.
+
 Use these checks after installation or when investigating an import
 problem. They do not require database administration tools.
 
 ## Check the installed services
 
-Open a terminal in `deploy/docker-compose` and run:
+From the repository root on the host, run:
 
 ```bash
-bash verify-prod.sh
+./scripts/verify-prod.sh
 ```
 
 The command checks the local configuration, protected credential files,
@@ -18,7 +24,7 @@ Docker connectivity, Compose configuration, and MariaDB health. It does
 not change the database.
 
 If a check fails, review the displayed message and use
-`bash setup-prod.sh` to continue a normal installation. Do not choose
+`./scripts/setup-prod.sh` to continue a normal installation. Do not choose
 an option that deletes or recreates stored data during troubleshooting.
 
 ## Register your utility
@@ -26,7 +32,7 @@ an option that deletes or recreates stored data during troubleshooting.
 To register SDG&E without entering a name interactively:
 
 ```bash
-bash register-prod.sh \
+./scripts/register-prod.sh \
   --utility 'SDG&E' \
   --source 'Manual XML Download'
 ```
@@ -41,7 +47,7 @@ Place the downloaded XML file in your configured private import folder.
 The default is `deploy/docker-compose/private-imports`.
 
 ```bash
-bash import-prod.sh --file usage-export.xml
+./scripts/import-prod.sh --file usage-export.xml
 ```
 
 Replace the filename with the downloaded XML filename. If you use a
@@ -61,15 +67,15 @@ Do not share raw utility XML or credentials in public issue reports.
 ## Home Assistant
 
 The database verification above does not check a Home Assistant
-connection. The Home Assistant integration requires the application API
-and its own authorization, distinct from MariaDB access.
+connection. The Home Assistant integration is planned for a separate project.
+It will use the authenticated application API, not MariaDB access.
 
 ## Preview and import multiple files
 
 Preview the files selected from your download directory:
 
 ```bash
-bash import-prod.sh \
+./scripts/import-prod.sh \
   --import-dir "$HOME/energy_usage/data" \
   --file "*.xml" \
   --list-files

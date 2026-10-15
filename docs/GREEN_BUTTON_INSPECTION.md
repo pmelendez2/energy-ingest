@@ -21,6 +21,8 @@ The inspector determines measurement characteristics from the XML itself.
 Provider filenames, portal labels, and user descriptions are not used as
 parsing rules.
 
+**Intended Audience:** Developers, profile maintainers, and operators inspecting XML.
+
 ## Green Button Terminology
 
 The inspector uses existing Green Button terminology wherever possible.

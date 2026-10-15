@@ -2,6 +2,12 @@
 
 # Glossary
 
+## Purpose
+
+Provide authoritative terminology for project documentation.
+
+**Intended Audience:** Developers, contributors, maintainers, and users.
+
 This glossary is the single terminology reference for the `energy_ingest` project.
 
 For established energy-industry and Green Button / Energy Services Provider Interface (ESPI) terms, this project does **not** redefine the term.

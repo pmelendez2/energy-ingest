@@ -1,5 +1,11 @@
 # Local API client credentials
 
+## Purpose
+
+Explain creation, listing, and revocation of local API client credentials.
+
+**Intended Audience:** Production operators and maintainers.
+
 The local application credential lifecycle follows ADR-0024.
 Credentials are separate from database passwords and utility OAuth tokens.
 

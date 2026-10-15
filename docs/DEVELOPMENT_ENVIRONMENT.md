@@ -6,6 +6,8 @@
 
 ## Purpose
 
+**Intended Audience:** Developers, contributors, and CI maintainers.
+
 `energy_ingest` uses Docker Compose as the reference development and test
 environment.
 
@@ -85,6 +87,18 @@ Usage:           automated verification
 
 Production is a separate deployment target and must not reuse development or
 test credentials or database state.
+
+## Cargo workspace and command verification
+
+The workspace contains packages `gb` and `gb_profile`, along with
+`energy-store`, `energy-api`, and other crates. There is no package
+called `greenbutton`. For profile commands use, from the project root:
+
+```bash
+cargo run -p gb_profile -- list
+```
+
+Check `Cargo.toml` package names before documenting new Cargo commands.
 
 ## Development Files
 
@@ -332,7 +346,7 @@ cargo fmt
 cargo check --workspace
 cargo clippy --workspace
 cargo test --workspace
-./scripts/verify.sh
+# Full database-backed verification is run from the host; see below.
 ```
 
 ## Development MariaDB Initialization
@@ -371,11 +385,15 @@ before health failures are counted.
 
 ## Test Workflow
 
-Run:
+From the repository root on the host, run:
 
 ```bash
-./test.sh
+./deploy/docker-compose/test.sh
 ```
+
+This is the recommended full verification command. Running
+`./scripts/verify.sh` directly requires an available isolated test
+database and `ENGY_T_DB_URL`. The Compose wrapper configures both.
 
 The workflow:
 
@@ -418,7 +436,8 @@ The current verification workflow covers:
 - unit tests;
 - integration tests;
 - documentation tests; and
-- ADR conformance.
+- ADR conformance; and
+- strict Markdown documentation validation.
 
 A successful run ends with output equivalent to:
 

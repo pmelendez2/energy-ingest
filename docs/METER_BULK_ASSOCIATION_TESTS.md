@@ -1,5 +1,11 @@
 # Meter resource association verification
 
+## Purpose
+
+Document non-destructive checks for bulk meter/resource associations.
+
+**Intended Audience:** Operators and maintainers validating meter associations.
+
 These commands apply to an existing Energy Usage installation with
 registered physical meters and imported Green Button observations.
 They do not require resetting the database or reimporting XML.

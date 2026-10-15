@@ -1,5 +1,11 @@
 # Physical meter profiles
 
+## Purpose
+
+Explain how imported resources relate to physical meter profiles.
+
+**Intended Audience:** Users and operators managing physical meter profiles.
+
 Energy Usage keeps the utility's imported Green Button resources separate
 from customer-defined physical meters. An optional friendly name identifies
 each physical meter, while the imported observations remain unchanged.
@@ -117,6 +123,7 @@ associations only; it does not merge or modify interval readings.
 
 ## Read-only resolution foundation
 
-The conservative initial interval-selection API is documented in
-[`USAGE_STREAM_RESOLUTION.md`](USAGE_STREAM_RESOLUTION.md). It is not yet
-a user-facing command or Home Assistant-ready reporting endpoint.
+The conservative interval-selection foundation is implemented in
+`crates/energy-store/src/usage_stream.rs` and exercised by
+`crates/energy-store/tests/usage_stream.rs` and `usage_stream_db.rs`.
+It is not yet a Home Assistant-ready reporting endpoint.

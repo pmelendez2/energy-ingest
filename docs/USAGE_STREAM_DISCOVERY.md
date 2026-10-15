@@ -2,6 +2,12 @@
 
 # Analyze imported Energy Usage data
 
+## Purpose
+
+Explain analysis of imported usage streams without modifying data.
+
+**Intended Audience:** Operators and developers investigating imported data.
+
 Run the analysis after importing Green Button XML. The command works
 without access to the original XML files and does not change data.
 

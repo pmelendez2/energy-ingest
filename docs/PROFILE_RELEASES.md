@@ -10,7 +10,7 @@
 **Status:** Pre-release; official release workflow validation pending.
 
 `gb_profile` is an independent Cargo package (`crates/gb_profile`).
-The `greenbutton` crate remains the shared parsing/profile library.
+The `gb` crate (`crates/gb`) is the shared parsing/profile library.
 Its library version does not determine the CLI release version.
 
 ## Version policy
@@ -30,7 +30,7 @@ From the `energy_ingest` repository root:
 cargo test --workspace
 cargo run -p gb_profile -- --version
 cargo run -p gb_profile -- version --verbose
-bash scripts/release_gb_profile.sh
+./scripts/release_gb_profile.sh
 ```
 
 The script produces `dist/gb_profile-vVERSION-linux-ARCH.tar.gz`
@@ -52,9 +52,9 @@ tag. It uploads two architecture-specific archives and publishes
 them as GitHub Release assets. The tag and artifacts are not a
 substitute for human release approval or downstream verification.
 
-**Important:** The GitHub workflow is designed for the repository
-root containing the `energy_ingest/` subdirectory. Releasing from
-other Git layouts requires adjusting the workflow working directory.
+**Repository layout:** The workflow operates from the standalone
+`energy_ingest` repository root. The executable package is in
+`crates/gb_profile`; do not introduce an extra `energy_ingest/` path.
 
 ## Installed usage
 

@@ -4,6 +4,9 @@
 
 ## Purpose
 
+**Intended Audience:** Production operators and maintainers.
+
+
 This guide explains how to operate the Energy Usage MariaDB deployment,
 including installation, database initialization, credentials, storage,
 maintenance, and access from the application services.
@@ -31,8 +34,8 @@ docker/Dockerfile.prod
 docker/es-adm-prod.sh
 deploy/docker-compose/compose.prod.yml
 deploy/docker-compose/.env.prod.example
-deploy/docker-compose/setup-prod.sh
-deploy/docker-compose/status-prod.sh
+scripts/setup-prod.sh
+scripts/verify-prod.sh
 deploy/docker-compose/bootstrap-prod.sh
 deploy/docker-compose/prod-secrets/.gitignore
 deploy/docker-compose/10-runtime-grants.sh
@@ -157,16 +160,27 @@ The setup menu includes:
 5) Cancel
 ```
 
-## Status
+## Verification
 
 Run:
 
 ```bash
-./status-prod.sh
+./scripts/verify-prod.sh
 ```
+
+Run from the repository or installation root.
 
 It reports settings, credential presence, database volume state, MariaDB
 container state, and health without displaying credential values.
+
+## Published production image
+
+The production Compose template selects the released multi-platform
+image `docker.io/pmelendez2/gb-energy-ingest:0.1.0` using
+`ENGY_APP_IMAGE`. It is published for AMD64 and ARM64 Linux containers;
+production users do not need to build the Rust image locally.
+The full release checks, native Pi 5 smoke-test scope, and digest are
+recorded in [release validation](RELEASE_0_1_0_VALIDATION.md).
 
 ## Production Administrative Image
 

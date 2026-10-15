@@ -17,6 +17,9 @@ acquisition mechanisms through provider adapters, including OAuth 2.0 APIs.
 
 ## Initial goals
 
+The following are project goals, not a declaration that each capability
+is complete. Home Assistant integration is planned separately.
+
 - Parse Green Button / ESPI XML correctly.
 - Preserve source measurement metadata and reading quality.
 - Support electricity and gas independently.
@@ -55,8 +58,17 @@ See `SECURITY.md` and the architecture decision records under `docs/adr/`.
 
 ## Project status
 
-Pre-release development. Features and release controls are at different
-stages of implementation; consult source and tests for current behavior.
+The first production Docker image, version `0.1.0`, is published for
+`linux/amd64` and `linux/arm64`. This is an initial release, not a claim
+that all planned features or platforms have been validated.
+
+- Image: `docker.io/pmelendez2/gb-energy-ingest:0.1.0`.
+- [Installation](docs/INSTALLATION.md) and
+  [Linux setup](docs/INSTALL_LINUX.md).
+- [Published release evidence](docs/RELEASE_0_1_0_VALIDATION.md).
+- [Production release checklist](docs/PRODUCTION_RELEASE_CHECKLIST.md).
+
+Consult source and tests for current feature readiness.
 
 ## Documentation
 
