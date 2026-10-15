@@ -24,8 +24,7 @@ or export database connection strings in your shell.
 Run the setup workflow from the deployment directory:
 
 ```bash
-cd deploy/docker-compose
-bash setup-prod.sh
+./scripts/setup-prod.sh
 ```
 
 The setup workflow preserves existing configuration and database data
@@ -40,7 +39,7 @@ to enter in your shell.
 
 | Setting | Purpose | Example | Normal user action |
 | --- | --- | --- | --- |
-| `ENGY_APP_IMAGE` | Production application image | `docker.io/pmelendez2/gb-energy-ingest:0.1.0` | Keep at a verified release |
+| `ENGY_APP_IMAGE` | Production application image | `docker.io/pmelendez2/gb-energy-ingest:VERSION` | Keep at a verified release |
 | `ENGY_DB_IMAGE` | MariaDB image | `mariadb:lts` | None |
 | `ENGY_DB_NAME` | Database name | `energy_ingest` | None |
 | `ENGY_DB_USER` | Database application account | `energy_ingest` | None |
@@ -98,14 +97,14 @@ The path must exist and be accessible to Docker. You may also choose
 a directory for an individual import using `--import-dir`:
 
 ```bash
-bash import-prod.sh --source-id 42 \
+./scripts/import-prod.sh --source-id 42 \
     --import-dir /home/user/energy-xml \
     --file usage-export.xml
 ```
 
 The import helper mounts the selected directory read-only in the
 container. Multiple XML files may share a directory, and imports do not
-delete the original downloads. Run `bash import-prod.sh --help` for
+delete the original downloads. Run `./scripts/import-prod.sh --help` for
 command-line options. Paths on Windows are described in
 [Windows installation](INSTALL_WINDOWS.md).
 
