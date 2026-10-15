@@ -61,18 +61,23 @@ jobs:
         run: bash scripts/test-prod-e2e.sh
   arm64-smoke:
     needs: verify
-    runs-on: ubuntu-26.04
+    # Native ARM64 runner avoids QEMU-based Rust compilation.
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - name: Build ARM64 production image (no publication)
-        run: |
-          docker buildx build --platform linux/arm64 \
-            --file docker/Dockerfile.prod \
-            --tag energy-ingest:arm64-release-check \
-            --load .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./docker/Dockerfile.prod
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: energy-ingest:arm64-release-check
+          cache-from: type=gha,scope=energy-prod-arm64
+          cache-to: type=gha,mode=max,scope=energy-prod-arm64
       - name: Inspect ARM64 platform and image files
         run: |
           arch="$(docker image inspect \
@@ -81,13 +86,11 @@ jobs:
           test "$arch" = arm64
           bash scripts/check-prod-image.sh \
             energy-ingest:arm64-release-check
-      - name: Execute ARM64 admin entrypoint through QEMU
+      - name: Execute ARM64 admin entrypoint natively
         run: |
           docker run --rm --network none \
-            --platform linux/arm64 \
             energy-ingest:arm64-release-check --help
           if docker run --rm --network none \
-            --platform linux/arm64 \
             -e ENGY_RUN_USER=root -e ENGY_RUN_GROUP=root \
             energy-ingest:arm64-release-check --help; then
             echo 'ERROR: ARM64 image permitted root application UID' >&2
@@ -132,7 +135,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           provenance: mode=min
           sbom: true
-          cache-from: type=gha,scope=energy-prod
+          # Reuse layers compiled on the native ARM64 runner.
+          cache-from: |
+            type=gha,scope=energy-prod-arm64
+            type=gha,scope=energy-prod
           cache-to: type=gha,mode=max,scope=energy-prod
       - name: Record image digest
         env:
