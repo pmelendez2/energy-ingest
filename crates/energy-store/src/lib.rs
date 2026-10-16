@@ -75,9 +75,13 @@ pub use retrieval_coverage::{
     get_retrieval_coverage_revision, list_retrieval_gaps,
 };
 
+mod window_fingerprint;
+pub use window_fingerprint::window_fingerprint;
+
 pub use usage_stream::{
-    SelectedInterval, StreamCandidate, StreamIssue, StreamIssueKind,
-    StreamResolution, resolve_candidates, resolve_physical_meter_stream,
+    MAX_WINDOW_CANDIDATES, SelectedInterval, StreamCandidate, StreamIssue,
+    StreamIssueKind, StreamResolution, resolve_candidates,
+    resolve_meter_window, resolve_physical_meter_stream,
 };
 
 use sqlx::{MySql, Pool};

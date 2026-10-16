@@ -119,6 +119,73 @@ pub async fn resolve_physical_meter_stream(
     Ok(resolve_candidates(candidates))
 }
 
+/// Upper bound on candidates evaluated for one historical window.
+pub const MAX_WINDOW_CANDIDATES: i64 = 10_000;
+
+/// Resolves readings beginning inside a half-open UTC window.
+///
+/// A limit is enforced *before* resolution: an overfull window fails rather
+/// than returning a partial stream or silently truncating duplicates.
+/// Callers must request smaller windows if the bound is exceeded.
+/// This is not a revision-watermark or snapshot-consistent retrieval API.
+pub async fn resolve_meter_window(
+    pool: &Pool<MySql>,
+    physical_meter_id: u64,
+    start: NaiveDateTime,
+    end: NaiveDateTime,
+) -> Result<Option<StreamResolution>, StoreError> {
+    let exists: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM physical_meter WHERE id = ?")
+            .bind(physical_meter_id)
+            .fetch_optional(pool)
+            .await?;
+    if exists.is_none() {
+        return Ok(None);
+    }
+
+    let candidates = sqlx::query_as::<_, StreamCandidate>(
+        r#"
+        SELECT mr.id AS meter_reading_id,
+               ir.id AS interval_reading_id,
+               ir.accepted_revision_id,
+               ir.interval_start, ir.interval_duration_seconds,
+               rev.reading_value, rev.reading_quality,
+               rt.accumulation_behaviour, rt.commodity,
+               rt.data_qualifier, rt.flow_direction,
+               rt.kind, rt.phase, rt.power_of_ten_multiplier,
+               rt.unit_of_measure
+        FROM physical_meter_resource AS pmr
+        JOIN meter_reading AS mr
+          ON mr.id = pmr.meter_reading_id
+        JOIN reading_type AS rt
+          ON rt.id = mr.reading_type_id
+        JOIN interval_reading AS ir
+          ON ir.meter_reading_id = mr.id
+        LEFT JOIN interval_reading_revision AS rev
+          ON rev.id = ir.accepted_revision_id
+        WHERE pmr.physical_meter_id = ?
+          AND ir.interval_start >= ?
+          AND ir.interval_start < ?
+        ORDER BY ir.interval_start, ir.interval_duration_seconds,
+                 ir.id
+        LIMIT ?
+        "#,
+    )
+    .bind(physical_meter_id)
+    .bind(start)
+    .bind(end)
+    .bind(MAX_WINDOW_CANDIDATES + 1)
+    .fetch_all(pool)
+    .await?;
+    if candidates.len() > MAX_WINDOW_CANDIDATES as usize {
+        return Ok(Some(StreamResolution {
+            candidate_count: candidates.len(),
+            ..StreamResolution::default()
+        }));
+    }
+    Ok(Some(resolve_candidates(candidates)))
+}
+
 /// Selects exact duplicates once; refuses ambiguous or overlapping data.
 ///
 /// This intentionally does not resample hourly/daily/monthly sources,

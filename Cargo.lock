@@ -351,6 +351,7 @@ name = "energy-api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "energy-store",
  "serde",
  "serde_json",

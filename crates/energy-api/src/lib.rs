@@ -5,14 +5,16 @@
 
 use axum::{
     Json, Router,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode, header},
     routing::get,
 };
+use chrono::NaiveDateTime;
 use energy_store::{
-    StoreError, authenticate_api_token, resolve_physical_meter_stream,
+    MAX_WINDOW_CANDIDATES, StoreError, authenticate_api_token,
+    resolve_meter_window, resolve_physical_meter_stream, window_fingerprint,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{MySql, Pool};
 use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
@@ -120,6 +122,8 @@ struct StreamResponse {
     resolved: bool,
     intervals: Vec<IntervalResponse>,
     issues: Vec<IssueResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    window_fingerprint: Option<String>,
 }
 
 fn issue_name(kind: energy_store::StreamIssueKind) -> &'static str {
@@ -187,6 +191,95 @@ async fn stream(
         resolved,
         intervals,
         issues,
+        window_fingerprint: None,
+    }))
+}
+
+/// Explicit UTC window, limited to 31 days per request.
+#[derive(Deserialize)]
+struct WindowQuery {
+    start: String,
+    end: String,
+}
+
+fn parse_window(
+    query: &WindowQuery,
+) -> Result<(NaiveDateTime, NaiveDateTime), ApiError> {
+    fn parse(value: &str) -> Option<NaiveDateTime> {
+        if !value.ends_with('Z') {
+            return None;
+        }
+        NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%SZ").ok()
+    }
+    let start = parse(&query.start)
+        .ok_or_else(|| failure(StatusCode::BAD_REQUEST, "invalid_window"))?;
+    let end = parse(&query.end)
+        .ok_or_else(|| failure(StatusCode::BAD_REQUEST, "invalid_window"))?;
+    let seconds = end.signed_duration_since(start).num_seconds();
+    if seconds <= 0 || seconds > 31 * 86_400 {
+        return Err(failure(StatusCode::BAD_REQUEST, "invalid_window"));
+    }
+    Ok((start, end))
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/meters/{id}/window",
+    params(
+        ("id" = u64, Path, description = "Physical meter ID"),
+        ("start" = String, Query, description = "UTC start, inclusive"),
+        ("end" = String, Query, description = "UTC end, exclusive"),
+    ),
+    responses(
+        (status = 200, description = "Resolved window", body = StreamResponse),
+        (status = 400, description = "Invalid UTC range", body = ErrorBody),
+        (status = 401, description = "Bearer token required", body = ErrorBody),
+        (status = 404, description = "Meter not found", body = ErrorBody),
+        (status = 409, description = "Ambiguous observations", body = ErrorBody),
+        (status = 413, description = "Reduce window size", body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn window(
+    State(state): State<AppState>,
+    Path(id): Path<u64>,
+    Query(query): Query<WindowQuery>,
+    headers: HeaderMap,
+) -> Result<Json<StreamResponse>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    let (start, end) = parse_window(&query)?;
+    let selected = resolve_meter_window(&state.pool, id, start, end)
+        .await
+        .map_err(store_failure)?
+        .ok_or_else(|| failure(StatusCode::NOT_FOUND, "not_found"))?;
+    if selected.candidate_count > MAX_WINDOW_CANDIDATES as usize {
+        return Err(failure(StatusCode::PAYLOAD_TOO_LARGE, "window_too_large"));
+    }
+    if !selected.issues.is_empty() {
+        return Err(failure(StatusCode::CONFLICT, "unresolved_stream"));
+    }
+    let count = selected.candidate_count;
+    let fingerprint = window_fingerprint(id, start, end, &selected.intervals);
+    let intervals = selected
+        .intervals
+        .into_iter()
+        .map(|item| IntervalResponse {
+            start_utc: item.start.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            duration_seconds: item.duration_seconds,
+            raw_value: item.raw_value,
+            meter_reading_id: item.meter_reading_id,
+            accepted_revision_id: item.accepted_revision_id,
+            power_of_ten_multiplier: item.power_of_ten_multiplier,
+            unit_of_measure: item.unit_of_measure,
+        })
+        .collect();
+    Ok(Json(StreamResponse {
+        physical_meter_id: id,
+        candidate_count: count,
+        resolved: true,
+        intervals,
+        issues: Vec::new(),
+        window_fingerprint: Some(fingerprint),
     }))
 }
 
@@ -201,7 +294,7 @@ async fn healthz() -> StatusCode {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(healthz, meters, stream),
+    paths(healthz, meters, stream, window),
     components(schemas(
         ErrorBody, Meter, IntervalResponse, IssueResponse, StreamResponse
     )),
@@ -242,6 +335,7 @@ pub fn router(pool: Pool<MySql>) -> Router {
         .route("/healthz", get(healthz))
         .route("/v1/meters", get(meters))
         .route("/v1/meters/{id}/stream", get(stream))
+        .route("/v1/meters/{id}/window", get(window))
         .with_state(AppState { pool })
 }
 

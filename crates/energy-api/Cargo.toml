@@ -6,6 +6,7 @@ edition = "2024"
 
 [dependencies]
 axum = "0.8"
+chrono = "0.4"
 energy-store = { path = "../energy-store" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
