@@ -27,7 +27,11 @@ async fn health_does_not_require_database_connection() {
 
 #[tokio::test]
 async fn protected_routes_reject_missing_bearer() {
-    for path in ["/v1/meters", "/v1/meters/1/stream"] {
+    for path in [
+        "/v1/meters",
+        "/v1/meters/1/stream",
+        "/v1/meters/1/window?start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z",
+    ] {
         let response = app()
             .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
             .await
@@ -55,11 +59,18 @@ fn openapi_matches_public_routes_and_bearer_contract() {
     let api = serde_json::to_value(energy_api::openapi()).unwrap();
     assert!(api["openapi"].as_str().unwrap().starts_with("3."));
     let paths = &api["paths"];
-    for path in ["/healthz", "/v1/meters", "/v1/meters/{id}/stream"] {
+    for path in [
+        "/healthz",
+        "/v1/meters",
+        "/v1/meters/{id}/stream",
+        "/v1/meters/{id}/window",
+    ] {
         assert!(paths[path]["get"].is_object(), "missing {path}");
     }
     assert!(paths["/healthz"]["get"]["security"].is_null());
-    for path in ["/v1/meters", "/v1/meters/{id}/stream"] {
+    for path in
+        ["/v1/meters", "/v1/meters/{id}/stream", "/v1/meters/{id}/window"]
+    {
         assert_eq!(
             paths[path]["get"]["security"][0]["bearer_auth"],
             serde_json::json!([]),
@@ -97,4 +108,13 @@ async fn developer_documentation_is_opt_in() {
         .await
         .unwrap();
     assert_eq!(docs.status(), StatusCode::OK);
+}
+
+#[test]
+fn bounded_endpoint_declares_failure_modes() {
+    let api = serde_json::to_value(energy_api::openapi()).unwrap();
+    let route = &api["paths"]["/v1/meters/{id}/window"]["get"];
+    for status in ["200", "400", "401", "404", "409", "413"] {
+        assert!(route["responses"][status].is_object(), "missing {status}");
+    }
 }

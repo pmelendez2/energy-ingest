@@ -77,6 +77,7 @@ The index below is intentionally maintained at the ADR level rather than assigni
 | ADR-0027 | Pending | Pending |
 | ADR-0028 | Pending | Pending |
 | ADR-0029 | Pending | Pending |
+| ADR-0030 | Pending | Pending |
 
 ## Review Process
 
