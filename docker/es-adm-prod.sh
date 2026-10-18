@@ -45,8 +45,8 @@ case "${1:-} ${2:-}" in
     'custodian create'|'source create'|'source list'|\
     'stream discover'|'stream analyze'|\
     'meter create'|'meter create-auto'|'meter rename'|\
-    'meter list'|'meter attach'|'meter attach-compatible'|\
-    'meter resources'|\
+    'meter list'|'meter set-number'|'meter attach'|\
+    'meter attach-compatible'|'meter resources'|\
     'api-token create'|'api-token list'|'api-token revoke')
         secret=/run/secrets/energy_db_pwd
         user="${ENGY_DB_USER:?database user is required}"

@@ -55,7 +55,7 @@ dst=/run/secrets/energy_db_root_pwd,readonly"
 
 # These wrappers always use temporary credentials and the internal network.
 app() {
-    docker run --rm --network "$NET" \
+    docker run --rm -i --network "$NET" \
         --mount "$app_mount" \
         -e ENGY_DB_NAME="$DB_NAME" \
         -e ENGY_DB_USER="$DB_USER" \
@@ -134,6 +134,20 @@ source_id="$(printf '%s\n' "$source_output" | \
     sed -n 's/^Source created: id=\([0-9][0-9]*\)$/\1/p')"
 [ -n "$source_id" ] || fail 'Could not parse source ID'
 
+# The guided customer workflow registers real meters before importing XML.
+# Two same-kind meters must not trigger a guessed resource association.
+printf 'Registering two meters before XML import ...\n'
+app meter create "$custodian_id" 1 'E2E Electric' \
+    >"$WORK/meter-created"
+meter_id="$(sed -n 's/.*(\([0-9][0-9]*\))$/\1/p' \
+    "$WORK/meter-created")"
+[ -n "$meter_id" ] || fail 'Could not parse meter ID'
+app meter create "$custodian_id" 1 'E2E Second Electric' \
+    >"$WORK/second-meter-created"
+second_meter_id="$(sed -n 's/.*(\([0-9][0-9]*\))$/\1/p' \
+    "$WORK/second-meter-created")"
+[ -n "$second_meter_id" ] || fail 'Could not parse second meter ID'
+
 printf 'Importing one sanitized XML fixture ...\n'
 fixture_dir="$(dirname -- "$FIXTURE")"
 fixture_file="$(basename -- "$FIXTURE")"
@@ -161,6 +175,35 @@ if not match or int(match.group(3)) < 1:
 print(f"PASS: {match.group(3)} observations accepted")
 PY
 
+printf 'Reimporting identical fixture to verify idempotency ...\n'
+docker run --rm --network "$NET" \
+    --mount "$app_mount" \
+    --mount "type=bind,src=$fixture_dir,dst=/fixtures,readonly" \
+    -e ENGY_DB_NAME="$DB_NAME" \
+    -e ENGY_DB_USER="$DB_USER" \
+    --entrypoint /usr/local/bin/engy-st-imp-prod-ep \
+    "$IMAGE" --source-id "$source_id" "/fixtures/$fixture_file" \
+    >"$WORK/reimport-report"
+python3 - "$WORK/reimport-report" <<'PY_REIMPORT'
+import re
+import sys
+from pathlib import Path
+
+report = Path(sys.argv[1]).read_text()
+match = re.search(r"^TOTAL\s+(\d+)\s+(\d+)\s+(\d+)",
+                  report, re.MULTILINE)
+if not match:
+    raise SystemExit("FAIL: reimport summary is missing")
+observed, unchanged, accepted = map(int, match.groups())
+if observed == 0 or unchanged == 0 or accepted != 0:
+    raise SystemExit(
+        "FAIL: identical reimport was not idempotent: "
+        f"observed={observed}, unchanged={unchanged}, "
+        f"accepted={accepted}"
+    )
+print(f"PASS: {unchanged} unchanged observations on reimport")
+PY_REIMPORT
+
 printf 'Creating disposable API token ...\n'
 # Only stdout contains the token. Never print or persist it in Git/logs.
 app api-token create e2e-release-check >"$WORK/api-token" \
@@ -173,14 +216,90 @@ printf 'header = "Authorization: Bearer %s"\n' \
     "$(cat "$WORK/api-token")" >"$WORK/curl-auth.conf"
 chmod 600 "$WORK/curl-auth.conf"
 
-printf 'Creating a meter and attaching compatible imported readings ...\n'
-app meter create "$custodian_id" 1 'E2E Electric' \
-    >"$WORK/meter-created"
-meter_id="$(sed -n 's/.*(\([0-9][0-9]*\))$/\1/p' \
-    "$WORK/meter-created")"
-[ -n "$meter_id" ] || fail 'Could not parse meter ID'
-app meter attach-compatible "$meter_id" --apply \
-    >"$WORK/meter-attach"
+printf 'Verifying imported resources are unassociated ...\n'
+app meter resources "$meter_id" >"$WORK/initial-meter-resources"
+app meter resources "$second_meter_id" \
+    >"$WORK/initial-second-resources"
+if grep -Eq '^[0-9]+$' "$WORK/initial-meter-resources" || \
+   grep -Eq '^[0-9]+$' "$WORK/initial-second-resources"; then
+    fail 'An imported resource was associated without confirmation'
+fi
+printf 'PASS: no automatic association with multiple meters\n'
+
+# Read the imported resource identifiers from the disposable database.
+# This is diagnostic test logic, never an instruction to end users.
+resource_ids="$(docker exec -i "$DB" sh -c '
+    export MYSQL_PWD="$(cat /run/secrets/energy_db_pwd)"
+    exec mariadb --batch --skip-column-names \
+        -u "$MARIADB_USER" "$MARIADB_DATABASE"
+' <<SQL_RESOURCES
+SELECT mr.id FROM meter_reading mr
+JOIN usage_point up ON up.id = mr.usage_point_id
+WHERE up.acquisition_source_id = $source_id
+ORDER BY mr.id;
+SQL_RESOURCES
+)"
+[ -n "$resource_ids" ] || fail 'Import produced no meter resources'
+resource_id="$(printf '%s\n' "$resource_ids" | head -n 1)"
+[[ "$resource_id" =~ ^[1-9][0-9]*$ ]] || \
+    fail 'Invalid imported resource identifier'
+
+# Model customer Skip: don't call attach at all, assert zero mappings.
+printf 'Verifying a skipped resource remains unassociated ...\n'
+app meter resources "$second_meter_id" \
+    >"$WORK/skipped-resources"
+if grep -Eq '^[0-9]+$' "$WORK/skipped-resources"; then
+    fail 'Skipped resource was unexpectedly assigned'
+fi
+printf 'PASS: skipped meter selection did not change ownership\n'
+
+# An explicit customer selection maps the chosen imported resource.
+printf 'Associating selected resource with confirmed meter ...\n'
+app meter attach "$meter_id" "$resource_id" \
+    >"$WORK/selected-attach"
+app meter resources "$meter_id" >"$WORK/attached-resources"
+grep -qx "$resource_id" "$WORK/attached-resources" || \
+    fail 'Confirmed meter association was not persisted'
+printf 'PASS: explicitly selected meter owns imported readings\n'
+
+printf 'Verifying private meter number and ownership isolation ...\n'
+number='E2E-METER-PRIVATE-0294'
+printf '%s\n' "$number" | \
+    app meter set-number "$meter_id" --stdin \
+    >"$WORK/meter-number-output" \
+    2>"$WORK/meter-number-error"
+if grep -Fq "$number" "$WORK/meter-number-output" || \
+   grep -Fq "$number" "$WORK/meter-number-error"; then
+    fail 'Utility meter number was exposed in administrative output'
+fi
+# Read the persisted value privately from disposable MariaDB; do not
+# echo the number into test logs.
+persisted_number="$(docker exec -i "$DB" sh -c '
+    export MYSQL_PWD="$(cat /run/secrets/energy_db_pwd)"
+    exec mariadb --batch --skip-column-names \
+        -u "$MARIADB_USER" "$MARIADB_DATABASE"
+' <<SQL_NUMBER
+SELECT meter_number FROM physical_meter WHERE id = $meter_id;
+SQL_NUMBER
+)"
+[ "$persisted_number" = "$number" ] || \
+    fail 'Utility meter number was not persisted correctly'
+printf 'PASS: utility meter number persisted without logging it\n'
+
+
+# A second meter of the same commodity must not be allowed to take
+# ownership of an already associated XML resource.
+if app meter attach "$second_meter_id" "$resource_id" \
+    >"$WORK/conflict-out" 2>"$WORK/conflict-err"; then
+    fail 'Resource could be reassigned to a different physical meter'
+fi
+app meter resources "$second_meter_id" \
+    >"$WORK/second-meter-resources"
+if grep -Eq '^[0-9]+$' "$WORK/second-meter-resources"; then
+    fail 'Conflicting resource was added to the second meter'
+fi
+printf 'PASS: duplicate association rejected; second meter remains empty\n'
+
 
 printf 'Starting authenticated production API ...\n'
 docker run -d --name "$API" --network "$NET" \

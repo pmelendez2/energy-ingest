@@ -2,113 +2,117 @@
 
 # Install Energy Usage
 
-**Purpose:** Guide customers through production setup, utility registration,
-and Green Button XML import without requiring a Rust toolchain.
+**Purpose:** Set up Energy Ingest from its production release and import
+Green Button XML without installing Rust or cloning the source repository.
 
-**Intended Audience:** Linux customers and installation administrators.
-Windows/WSL2 users should review its unvalidated platform guidance.
+**Intended audience:** Linux customers and administrators. The Linux
+installation is currently the validated production path.
 
-## Published release and prerequisites
+## 1. Download, initialize, and verify
 
-A versioned production image is published at
-`docker.io/pmelendez2/gb-energy-ingest` for Linux AMD64 and ARM64.
-Obtain the matching official installation ZIP and checksum from
-[GitHub Releases](https://github.com/pmelendez2/energy_ingest/releases).
-The extracted `.env.prod.example` pins the corresponding image tag.
+Follow [Install on Linux](INSTALL_LINUX.md) first. That guide downloads the
+verified production release, initializes MariaDB and its schema, and runs
+verification. **Do not repeat setup after returning to this guide.**
 
-Follow [Linux installation](INSTALL_LINUX.md) or
-[Windows guidance](INSTALL_WINDOWS.md) first. Windows/WSL2 installation
-has not been validated for this release. No host Rust installation is
-needed to run the production image.
+If you already see `Deployment checks passed`, continue with step 2.
+Do not recreate the database or its credentials.
 
-Run the commands below **from the project root**. Scripts in `scripts/`
-locate their Compose configuration automatically. The `.sh` scripts have
-Bash shebangs; use direct execution when their executable bits are retained.
+## 2. Keep the original Green Button XML files in your own directory
 
-## 1. Set up the database
-
-```bash
-./scripts/setup-prod.sh
-./scripts/verify-prod.sh
-```
-
-The interactive setup prepares credentials and starts MariaDB and the
-schema migration service. Normal setup preserves existing database data.
-Review any recreate/remove prompt carefully: those operations can delete data.
-XML exports are not needed for initial setup.
-
-## 2. Store Green Button XML on the host
-
-Download Green Button XML exports from your utility provider and store
-copies privately. The **default host operating-system directory**, relative
-to the project checkout or extracted installation directory, is:
+Download Green Button XML exports from your utility provider. Keep the
+original files in a **private directory you control, outside**
+`$HOME/energy-ingest-prod` and its `deploy/docker-compose/` directory.
+Use a full (absolute) Linux path for that directory, for example:
 
 ```text
-deploy/docker-compose/private-imports/
+/home/user/utility-xml
 ```
 
-`./scripts/setup-prod.sh` creates this directory during initialization,
-so no manual directory creation is normally required. To open it from a
-terminal at the project root:
+The directory must already exist and contain readable `.xml` files. Do not
+commit or attach original customer XML to public issues or repositories.
+You do not need to copy your originals into `private-imports` yourself.
+
+## 3. Run the guided utility registration and XML import
+
+The standard first-time workflow is the interactive guided importer:
 
 ```bash
-cd deploy/docker-compose/private-imports
-pwd
+"$HOME/energy-ingest-prod/scripts/energy-import.sh" \
+  --import-dir "/absolute/path/to/your/utility-xml"
 ```
 
-Move or copy your downloaded `.xml` files into that host folder using
-your preferred file manager or standard file copy operation. Return to
-the project root before running the commands below. The import script
-uses a read-only Docker container mount for the selected host folder;
-it does not modify or delete the originals.
+Replace the example path with the location of your original XML files.
+The default selection is `*.xml`. To select a subset, use a quoted file
+pattern, for example `--file 'electric-*.xml'`. Run
+`"$HOME/energy-ingest-prod/scripts/energy-import.sh" --help` for options.
 
-You may alternatively use `--import-dir` with an absolute host path,
-or configure `ENGY_IMPORT_DIR` in `deploy/docker-compose/.env.prod`.
-The script resolves relative paths from `deploy/docker-compose/`, not
-from your shell's current directory. See [Configuration](CONFIGURATION.md).
+The guided installer will:
 
-## 3. Register an acquisition source
+1. Show the selected XML files and ask permission to copy them into
+   protected application storage for import. Your originals remain in
+   your own directory and are not changed.
+2. Register or select your utility and download source by name.
+3. Register your physical electricity and gas meters, including their
+   utility-assigned meter numbers, before importing XML.
+4. Import the selected XML files after your confirmation.
+5. Review imported file data and confirm association with the correct
+   physical meters. When multiple meters of the same commodity are
+   registered, automatic association is disabled. Individual
+   associations must be reviewed using the meter administration tool.
+
+**Before starting:** Find the actual utility-assigned meter numbers on
+your bill or online utility account and keep them available for meter
+identification. These are different from Energy Ingest database IDs.
+Green Button XML may not include the utility meter numbers.
+
+The guided workflow requests the actual utility-assigned meter number,
+displays the entered value for confirmation, and stores it separately
+from the friendly meter name.
+
+Physical meter registration requires an administration image supporting
+the `meter set-number` command, available beginning with v0.1.4.
+Earlier releases do not support this onboarding procedure.
+
+## 4. Verify the installation and import
+
+Recheck deployment health:
 
 ```bash
-./scripts/register-prod.sh
+"$HOME/energy-ingest-prod/scripts/verify-prod.sh"
 ```
 
-Follow the prompts to identify the utility and the source of the XML
-export. Retain the returned source ID if you use more than one source.
-
-## 4. Preview and import XML files
-
-From the **project root**:
+Verify physical meters and their assignments with the supplied meter
+administration tool:
 
 ```bash
-./scripts/import-prod.sh --file '*.xml' --list-files
-./scripts/import-prod.sh --file '*.xml'
+"$HOME/energy-ingest-prod/scripts/meter-prod.sh" list
 ```
 
-To use a different host directory, add:
+The guided script reports whether association finished. A successful import
+is not proof that historical readings are gap-free or that usage streams
+are conflict-free; review the results before using any totals.
 
-```text
---import-dir /absolute/host/path
-```
+For database and backup operations, see
+[Production Database](PRODUCTION_DATABASE.md). For advanced manual operations,
+see [Command Reference](SCRIPT_COMMANDS.md).
 
-A single registered acquisition source is selected automatically. If
-there are multiple sources, pass `--source-id ID`. Do not combine exports
-from different acquisition sources under one ID. Keep XML exports private;
-never attach raw customer data to public support requests.
+## 5. Additional settings and advanced imports
 
-## 5. Verify and maintain
+`deploy/docker-compose/private-imports/` is the application-managed staging
+location. It is **not** the recommended permanent home of original utility
+exports. The optional `ENGY_IMPORT_DIR` field in
+`deploy/docker-compose/.env.prod` configures the Compose-side default import
+path for manual import operations. It does not relocate or manage your
+original downloads, and it is not necessary with guided `--import-dir`.
 
-```bash
-./scripts/verify-prod.sh
-```
+If Compose environment or bind-mount settings are edited, **recreate the
+affected Compose service** for the change to take effect; simply restarting
+an existing container does not apply changed Compose configuration. Do not
+recreate database volumes. See [Configuration](CONFIGURATION.md).
 
-See [Production Database](PRODUCTION_DATABASE.md) for secrets, storage,
-backups, and maintenance. See [Command Reference](SCRIPT_COMMANDS.md)
-for additional operations.
+## Home Assistant integration
 
-## Planned: Home Assistant integration
-
-A separate `ha_energy_usage` Home Assistant integration is planned.
-It is **not** part of this validated installation procedure. The planned
-integration will use the application's authenticated API, not direct
-MariaDB access. Do not expose MariaDB to Home Assistant or the internet.
+The separate `ha_energy_usage` Home Assistant integration is not part of
+this backend installer. It communicates through the authenticated Energy
+Ingest API; Home Assistant never connects directly to MariaDB. The HA
+integration's installation and runtime validation are a separate stage.

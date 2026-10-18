@@ -20,6 +20,7 @@ files=(
   scripts/verify-prod.sh
   scripts/register-prod.sh
   scripts/import-prod.sh
+  scripts/energy-import.sh
   scripts/meter-prod.sh
   scripts/analyze-prod-data.sh
   deploy/docker-compose/compose.prod.yml

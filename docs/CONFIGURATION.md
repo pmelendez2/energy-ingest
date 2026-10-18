@@ -21,10 +21,10 @@ or export database connection strings in your shell.
 - Storage for the database's persistent Docker volume.
 - A private location for utility XML files you intend to import.
 
-Run the setup workflow from the deployment directory:
+Run the setup workflow using its full installation path:
 
 ```bash
-./scripts/setup-prod.sh
+"$HOME/energy-ingest-prod/scripts/setup-prod.sh"
 ```
 
 The setup workflow preserves existing configuration and database data
@@ -78,35 +78,35 @@ Keep a backup of data you wish to preserve before performing database
 maintenance, replacing storage, or selecting a destructive setup option.
 See [Production Database](PRODUCTION_DATABASE.md) for operational details.
 
-## Utility XML files
+## Utility XML files and staging
 
-The default private input directory is:
-
-```text
-deploy/docker-compose/private-imports/
-```
-
-You may choose another directory on the host. To configure a default,
-add the following line to `.env.prod`:
-
-```dotenv
-ENGY_IMPORT_DIR=/home/user/energy-xml
-```
-
-The path must exist and be accessible to Docker. You may also choose
-a directory for an individual import using `--import-dir`:
+For first-time onboarding, follow [Installation](INSTALLATION.md). Keep
+original utility XML exports in a private customer-owned directory **outside**
+the Energy Ingest installation. Use the guided import command and an
+absolute path to the customer's directory:
 
 ```bash
-./scripts/import-prod.sh --source-id 42 \
-    --import-dir /home/user/energy-xml \
-    --file usage-export.xml
+"$HOME/energy-ingest-prod/scripts/energy-import.sh" \
+  --import-dir "/absolute/path/to/your/utility-xml"
 ```
 
-The import helper mounts the selected directory read-only in the
-container. Multiple XML files may share a directory, and imports do not
-delete the original downloads. Run `./scripts/import-prod.sh --help` for
-command-line options. Paths on Windows are described in
-[Windows installation](INSTALL_WINDOWS.md).
+The guided script offers to copy selected XML files into restricted
+application storage solely to make them available to the import container.
+These copies remain private customer data; no anonymization is performed.
+Original files remain unchanged.
+
+`ENGY_IMPORT_DIR` in `deploy/docker-compose/.env.prod` is an **optional
+Compose-side import default** for advanced manual operations, not the
+location customers must use for original XML and not needed for the guided
+`--import-dir` path. If changing Compose environment or mount configuration,
+recreate the **affected service**, rather than only restarting an existing
+container. Never recreate the persistent MariaDB volume merely to apply a
+configuration change.
+
+For advanced, noninteractive import commands, see
+[Command Reference](SCRIPT_COMMANDS.md). Internal numeric source IDs are
+shown with their friendly names when relevant; do not copy example numbers
+such as `42` into customer commands.
 
 ## Troubleshooting configuration
 

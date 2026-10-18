@@ -1,20 +1,21 @@
 # Energy Usage Command-Line Operations
 
-**Purpose:** Reference supported production administration scripts.
+**Purpose:** Document the supported Energy Ingest production
+administration commands and guided XML import workflow.
 
-**Intended Audience:** Production operators.
+**Intended Audience:** Customers, system administrators, and
+operators managing an Energy Ingest installation.
 
-The scripts locate `deploy/docker-compose` relative to their own file
-locations. **The command examples below assume the project root as the
-current working directory** because they start with `./scripts/`.
-From another directory, invoke a script using its absolute path.
-A host with Docker Engine and Docker Compose is required.
+Use the commands in the project `scripts/` directory. They work from any
+working directory; each locates `deploy/docker-compose` automatically.
+Run each command from the unpacked Energy Usage distribution on a host
+with Docker Engine and Docker Compose available.
 
 ## Set up Energy Usage
 
 ```bash
-./scripts/setup-prod.sh
-./scripts/verify-prod.sh
+"$HOME/energy-ingest-prod/scripts/setup-prod.sh"
+"$HOME/energy-ingest-prod/scripts/verify-prod.sh"
 ```
 
 The installation initializes a database without requiring XML downloads.
@@ -22,33 +23,32 @@ Select start/update for routine startup, refresh to recreate application
 containers while retaining data, or the explicitly labeled reset/uninstall
 options when you intend to remove data or resources.
 
-## Register and import utility usage data
+## Guided registration and import (recommended)
+
+**Keep the original XML exports in a private directory outside the Energy ingest installation.** Removing the installation directory also removes any XML files stored within it.  The guided importer preserves your original files. Register or choose a named source, and associate meters using one guided command:
 
 ```bash
-./scripts/register-prod.sh \
-  --utility 'SDG&E' \
-  --source 'Manual XML Download'
-
-./scripts/import-prod.sh \
-  --import-dir "$HOME/energy_usage/data" \
-  --file '*.xml' --list-files
-
-./scripts/import-prod.sh \
-  --import-dir "$HOME/energy_usage/data" \
-  --file '*.xml'
+"$HOME/energy-ingest-prod/scripts/energy-import.sh" \
+  --import-dir "/absolute/path/to/your/utility-xml"
 ```
 
-The importer selects the only registered acquisition source automatically.
-With multiple sources, specify `--source-id` to disambiguate.
-File download may happen before or after installation.
+The script stages selected files in application-managed `private-imports`
+after confirmation, but **does not sanitize** the XML. It never deletes the
+customer's original downloads. Names are presented for source selection;
+numeric IDs are internal and not required in the default onboarding flow.
+Meter numbers are entered privately and sent to the Rust backend on stdin.
+
+The lower-level `register-prod.sh`, `import-prod.sh` and `meter-prod.sh`
+commands remain available for advanced administration. See their `--help`
+output and [Installation](INSTALLATION.md) for the standard workflow.
 
 ## Analyze and manage meters
 
 ```bash
-./scripts/analyze-prod-data.sh
-./scripts/analyze-prod-data.sh --details
-./scripts/meter-prod.sh list
-./scripts/meter-prod.sh attach-compatible --meter 1
+bash scripts/analyze-prod-data.sh
+bash scripts/analyze-prod-data.sh --details
+bash scripts/meter-prod.sh list
+bash scripts/meter-prod.sh attach-compatible --meter 1
 ```
 
 Meter profile and Green Button resource IDs are internal identifiers.
@@ -65,22 +65,9 @@ in `docker/` and `deploy/docker-compose/`, respectively.
 
 The accepted ADR-0012 specifies that the CLI and local API share reusable
 application logic; they must not implement different business rules.
-These commands are a local administrative interface, not HTTP clients.
-The separate authenticated API is not used by these scripts.
+Until an authenticated API is implemented, these commands remain a local
+administrative interface rather than an HTTP client.
 
 Credentials reside in Compose-mounted secret files, not these scripts.
 The CLI migration/bootstrap operation remains an administrative operation
 outside the ordinary application API.
-
-## Developer verification
-
-From the repository root, use the isolated test workflow:
-
-```bash
-./deploy/docker-compose/test.sh
-```
-
-The Compose wrapper creates and removes a temporary MariaDB test
-environment. Running `./scripts/verify.sh` directly requires a working
-test database and `ENGY_T_DB_URL`. Verification includes strict
-Markdown documentation validation.

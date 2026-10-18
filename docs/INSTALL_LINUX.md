@@ -2,27 +2,27 @@
 
 # Install on Linux
 
-**Purpose:** Obtain the published source release containing production
-Compose definitions and setup scripts, then initialize Energy Usage.
+**Purpose:** Download the verified production installer and initialize the
+Energy Ingest backend on Linux, then continue to guided XML onboarding.
 
-**Intended Audience:** Linux customers and system administrators.
+**Intended audience:** Linux customers and system administrators.
 
 ## Requirements
 
-Install Docker Engine, Docker Compose v2, Git, and access to Docker Hub.
-The account running setup must be authorized to operate Docker. Docker
-access is privileged; follow Docker's security guidance. No host Rust
-compiler or MariaDB server is required.
+Install Docker Engine, Docker Compose v2, `curl`, `unzip`, and `sha256sum`.
+The account running setup needs permission to operate Docker (a privileged
+capability). Access to Docker Hub is required. No Rust compiler, Git clone,
+or host MariaDB installation is required.
 
-## Obtain the official release archive
+## Download the official production release
 
-Open the [GitHub Releases page](https://github.com/pmelendez2/energy_ingest/releases)
-and choose the version you intend to install. The release must provide an
-`energy-ingest-prod-VERSION.zip` file and its `.sha256` checksum.
-For example, for release `0.1.2`, run these commands on your **Linux host**:
+Select the current stable version from the
+[official releases](https://github.com/pmelendez2/energy_ingest/releases).
+Set `version` to that release number. The following example targets
+**v0.1.4**:
 
 ```bash
-version=0.1.2
+version=0.1.4
 base="https://github.com/pmelendez2/energy_ingest/releases/download/energy-ingest-v${version}"
 mkdir -p "$HOME/energy-ingest-prod"
 cd "$HOME/energy-ingest-prod"
@@ -32,24 +32,28 @@ sha256sum -c "energy-ingest-prod-${version}.zip.sha256"
 unzip "energy-ingest-prod-${version}.zip"
 ```
 
-If any download or checksum step fails, **stop**. Do not use a
-privately assembled archive or substitute source files. The archive
-contains production scripts, Compose configuration, and documentation;
-Docker Compose subsequently pulls the version-matched image from Docker Hub.
-No Git checkout or Rust toolchain is required.
+Stop if the download or checksum verification fails. Production setup uses
+the version-matched Docker image defined in the extracted `.env` template.
+Do not replace it with a locally built development image.
 
-## Initialize and verify
+## Initialize and verify MariaDB (one-time step)
 
-From the project root, run:
+These commands may be executed from any working directory:
 
 ```bash
-./scripts/setup-prod.sh
-./scripts/verify-prod.sh
+"$HOME/energy-ingest-prod/scripts/setup-prod.sh"
+"$HOME/energy-ingest-prod/scripts/verify-prod.sh"
 ```
 
-Setup generates local credentials and initializes MariaDB. Follow its
-interactive prompts; ordinary startup preserves existing database data.
+Read the interactive setup prompts carefully. On first installation, setup
+creates database credentials, a persistent MariaDB volume, and the schema.
+Normal subsequent setup preserves existing data; recreate/remove options can
+destroy it. The database is not exposed on host port 3306.
 
-Continue with [Installation](INSTALLATION.md) for the host-side import
-folder, registration, and XML import instructions. Production secrets
-are generated under `deploy/docker-compose/prod-secrets/`.
+After `Deployment checks passed`, **do not repeat setup**. Continue directly
+to **step 2** of [Installation](INSTALLATION.md) to locate original utility
+XML and run guided import.
+
+Secrets are generated in
+`$HOME/energy-ingest-prod/deploy/docker-compose/prod-secrets/`.
+Do not publish their contents.
