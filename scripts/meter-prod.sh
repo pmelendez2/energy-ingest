@@ -15,6 +15,7 @@ usage() {
 Usage: ./meter-prod.sh list
        ./meter-prod.sh create [--custodian ID] --kind electric|gas \
            --name NAME
+       ./meter-prod.sh set-number --meter ID
        ./meter-prod.sh rename --meter ID --name NAME
        ./meter-prod.sh attach --meter ID --resource ID
        ./meter-prod.sh attach-compatible --meter ID [--yes]
@@ -55,6 +56,36 @@ case "$verb" in
         else
             args=(meter create-auto "$code" "$name")
         fi ;;
+    set-number)
+        [[ $# -eq 2 && "$1" == '--meter' ]] || {
+            usage >&2; exit 2
+        }
+        [[ "$2" =~ ^[1-9][0-9]*$ ]] || exit 2
+        [[ -f .env.prod ]] || {
+            echo 'Error: run setup-prod.sh first.' >&2
+            exit 2
+        }
+        [[ -t 0 ]] || {
+            echo 'Error: interactive terminal required.' >&2
+            exit 2
+        }
+        read -r -p 'Utility meter number: ' number
+        [[ -n "$number" && ${#number} -le 255 ]] || {
+            echo 'Error: invalid meter number.' >&2
+            exit 2
+        }
+        printf 'Entered meter number: %s\n' "$number"
+        read -r -p 'Save this meter number? [y/N]: ' answer
+        case "$answer" in
+            y|Y|yes|YES) ;;
+            *) unset number; echo 'Meter number not saved.'; exit 0 ;;
+        esac
+        # Pipe the number to stdin; never put it on the command line.
+        printf '%s\n' "$number" | docker compose -p energy-ingest \
+            --env-file .env.prod -f compose.prod.yml \
+            run -T --rm --no-deps admin meter set-number "$2" --stdin
+        unset number
+        exit 0 ;;
     rename)
         meter='' name=''
         while [[ $# -gt 0 ]]; do
@@ -105,7 +136,7 @@ case "$verb" in
         "${compose[@]}" run --rm --no-deps admin \
             meter attach-compatible "$meter"
         if [[ "$yes" -eq 0 ]]; then
-            read -r -p 'Associate the eligible resources? [y/N]: ' answer
+            read -r -p 'Associate the eligible file data? [y/N]: ' answer
             [[ "$answer" == [yY] ]] || {
                 echo 'No associations changed.'
                 exit 0

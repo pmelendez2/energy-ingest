@@ -222,7 +222,7 @@ migrate_database() {
     # Pull the versioned application image; never build production from
     # local source. Migrations are safe on repeat runs.
     printf 'Applying and verifying production schema...\n'
-    "${COMPOSE[@]}" run --rm --pull always --no-deps \
+    "${COMPOSE[@]}" run --rm --pull missing --no-deps \
         migrate database bootstrap
 }
 

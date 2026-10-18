@@ -13,13 +13,19 @@ see [Installation](INSTALLATION.md).
 
 1. Clean Git tree, code review, and `scripts/check-publication.sh`.
 2. `./deploy/docker-compose/test.sh` (isolated Rust test suite).
-3. `docker build -f docker/Dockerfile.prod -t energy-ingest:release-check .`.
-4. `./scripts/check-prod-image.sh energy-ingest:release-check`.
-5. `./scripts/audit-prod-release.sh energy-ingest:release-check`.
-6. `ENGY_TEST_IMAGE=energy-ingest:release-check ./scripts/test-prod-runtime.sh`.
-7. ARM64 Buildx build and administrative CLI/root-denial smoke tests.
-8. Review critical CVE findings, build inputs, SBOM, and provenance.
-9. Verify the source is on `main` and GitHub checks have passed.
+3. `bash scripts/check-prod-package.sh X.Y.Z` to validate the exact
+   production installer ZIP, image reference, executable modes, and scripts.
+4. `docker build -f docker/Dockerfile.prod -t energy-ingest:release-check .`.
+5. `./scripts/check-prod-image.sh energy-ingest:release-check`.
+6. `./scripts/audit-prod-release.sh energy-ingest:release-check`.
+7. `ENGY_TEST_IMAGE=energy-ingest:release-check ./scripts/test-prod-runtime.sh`.
+8. `ENGY_TEST_IMAGE=energy-ingest:release-check \
+   bash scripts/test-prod-e2e.sh` using approved sanitized XML.
+   Confirm identical reimport, utility meter-number persistence/privacy,
+   and rejection of conflicting resource ownership.
+9. ARM64 Buildx build and administrative CLI/root-denial smoke tests.
+10. Review critical CVE findings, build inputs, SBOM, and provenance.
+11. Verify the source is on `main` and GitHub checks have passed.
 
 ## Publishing
 
@@ -60,3 +66,11 @@ that they are committed and active on the release branch before relying
 on them. Benchmark a subsequent release before claiming reduced build
 duration; cache reuse does not ensure that the published image is
 bit-for-bit identical to the separately tested smoke image.
+
+## Guided multi-meter selection
+
+Run `bash scripts/test-guided-meter-selection.sh` to check customer
+selection of a registered meter, skip behavior, refusal of invalid
+selections, and refusal of unconfirmed associations. This test uses
+mocked database reads and validates the actual Bash selection function;
+it does not replace the disposable MariaDB production E2E test.

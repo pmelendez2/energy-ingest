@@ -10,7 +10,11 @@ use energy_store::{
     get_data_custodian, get_source_by_name,
 };
 use sqlx::mysql::MySqlPoolOptions;
-use std::{env, process::ExitCode};
+use std::{
+    env,
+    io::{self, Read},
+    process::ExitCode,
+};
 
 const USAGE: &str = "\
 Usage:
@@ -22,6 +26,7 @@ Usage:
   energy-store-admin stream discover [--details]
   energy-store-admin meter create CUSTODIAN_ID COMMODITY NAME
   energy-store-admin meter create-auto COMMODITY NAME
+  energy-store-admin meter set-number METER_ID --stdin
   energy-store-admin meter rename METER_ID NAME
   energy-store-admin meter list
   energy-store-admin meter attach METER_ID RESOURCE_ID
@@ -50,6 +55,7 @@ enum Command {
     MeterCreate(u64, u32, String),
     MeterCreateAuto(u32, String),
     MeterRename(u64, String),
+    MeterSetNumber(u64),
     MeterList,
     MeterAttach(u64, u64),
     MeterAttachCompatible(u64, bool),
@@ -114,6 +120,11 @@ fn parse(args: &[String]) -> Result<Command, String> {
                 return Err("commodity must be 1 or 7".into());
             }
             Ok(Command::MeterCreateAuto(kind, parse_name(name)?))
+        }
+        [a, b, id, flag]
+            if a == "meter" && b == "set-number" && flag == "--stdin" =>
+        {
+            Ok(Command::MeterSetNumber(parse_id(id)?))
         }
         [a, b, id, name] if a == "meter" && b == "rename" => {
             Ok(Command::MeterRename(parse_id(id)?, parse_name(name)?))
@@ -293,6 +304,35 @@ async fn execute(args: &[String]) -> Result<(), String> {
                 name,
                 result.last_insert_id()
             );
+        }
+        Command::MeterSetNumber(meter) => {
+            // Read privately via stdin, never from process arguments.
+            // The value is not included in success/error output.
+            let mut bytes = Vec::new();
+            io::stdin()
+                .take(1025)
+                .read_to_end(&mut bytes)
+                .map_err(|_| "cannot read meter number from stdin")?;
+            if bytes.len() > 1024 {
+                return Err("meter number exceeds input limit".into());
+            }
+            let number = String::from_utf8(bytes)
+                .map_err(|_| "meter number is not UTF-8")?;
+            let number = number.trim_end_matches(['\r', '\n']);
+            let number = parse_name(number)
+                .map_err(|_| "invalid utility meter number")?;
+            let result = sqlx::query(
+                "UPDATE physical_meter SET meter_number = ? WHERE id = ?",
+            )
+            .bind(&number)
+            .bind(meter)
+            .execute(&pool)
+            .await
+            .map_err(|_| "meter number update failed")?;
+            if result.rows_affected() == 0 {
+                return Err("meter profile not found".into());
+            }
+            println!("Utility meter number saved.");
         }
         Command::MeterRename(meter, name) => {
             let result = sqlx::query(
@@ -503,10 +543,44 @@ async fn attach_compatible(
     println!("Already associated: {existing}");
     println!("Eligible to associate: {}", pending.len());
     if !pending.is_empty() {
-        println!("Resource IDs (diagnostics):");
+        println!("Imported file data (provider metadata):");
         for id in &pending {
-            println!("  {id}");
+            let detail: (
+                u64,
+                String,
+                Option<u32>,
+                Option<String>,
+                Option<String>,
+            ) = sqlx::query_as(
+                "SELECT up.id, src.name, rt.unit_of_measure, \
+                 CAST(MIN(ib.interval_start) AS CHAR), \
+                 CAST(MAX(DATE_ADD(ib.interval_start, \
+                   INTERVAL ib.interval_duration_seconds SECOND)) AS CHAR) \
+                 FROM meter_reading mr \
+                 JOIN usage_point up ON up.id = mr.usage_point_id \
+                 JOIN acquisition_source src \
+                   ON src.id = up.acquisition_source_id \
+                 JOIN reading_type rt ON rt.id = mr.reading_type_id \
+                 LEFT JOIN interval_block ib ON ib.meter_reading_id = mr.id \
+                 WHERE mr.id = ? \
+                 GROUP BY up.id, src.name, rt.unit_of_measure",
+            )
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|_| "resource preview lookup failed")?;
+            let (usage_point, source, unit, start, end) = detail;
+            println!(
+                "  File data entry {id}: source={source}; \
+                usage point={usage_point}; unit code={unit:?}"
+            );
+            println!(
+                "    Observed block coverage (UTC): {} to {}",
+                start.as_deref().unwrap_or("not supplied"),
+                end.as_deref().unwrap_or("not supplied")
+            );
         }
+        println!("Compatibility is not proof of physical ownership.");
     }
     if !apply {
         println!("Preview only. No associations were changed.");
@@ -525,7 +599,7 @@ async fn attach_compatible(
         .map_err(|_| "resource association failed")?;
     }
     tx.commit().await.map_err(|_| "association commit failed")?;
-    println!("Associated {} resource(s).", pending.len());
+    println!("Associated {} file data entries.", pending.len());
     Ok(())
 }
 
@@ -759,6 +833,18 @@ mod tests {
             Ok(Command::MeterRename(2, "Gas".into()))
         );
         assert!(parse(&args(&["meter", "create-auto", "99", "Bad"])).is_err());
+    }
+
+    #[test]
+    fn meter_number_requires_private_stdin_option() {
+        assert_eq!(
+            parse(&args(&["meter", "set-number", "2", "--stdin"])),
+            Ok(Command::MeterSetNumber(2))
+        );
+        assert!(parse(&args(&["meter", "set-number", "2", "123"])).is_err());
+        assert!(
+            parse(&args(&["meter", "set-number", "0", "--stdin"])).is_err()
+        );
     }
 
     #[test]

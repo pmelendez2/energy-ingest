@@ -103,9 +103,9 @@ printf '\nEnergy Ingest — Guided Import\n'
 printf 'Selected %s XML files from %s\n' \
     "${#files[@]}" "$import_dir"
 printf '  %s\n' "${files[@]}"
-printf 'Have physical electricity/gas meter numbers available.\n'
+printf '\nHave utility meter numbers available.\n'
 printf 'Keep original XML files outside the installation folder.\n'
-printf 'Removing that folder may delete its private-imports copies.\n'
+printf 'Installation cleanup can remove staged copies.\n'
 
 
 # Production build defines the application user/group. Resolve numeric IDs
@@ -165,7 +165,7 @@ set_managed_file_access() {
 if [[ "$import_dir" != "$staging_dir" ]]; then
     printf '\nFiles require secure staging in %s\n' "$staging_dir"
     printf 'Original files will not be modified.\n'
-    printf 'Staging approval includes setting private access for import.\n'
+    printf 'Staging applies private file permissions.\n'
     printf 'Staged copies may be deleted with the installation folder.\n'
     printf 'Declining staging cancels the import.\n'
 
@@ -302,12 +302,12 @@ if [[ -n "$source_rows" ]]; then
     mapfile -t source_records <<< "$source_rows"
 fi
 
-printf '\nAcquisition-source registration\n'
+printf '\nUtility registration\n'
 if ((${#source_records[@]} == 0)); then
     [[ -z "$source_id" ]] ||
         die 'No sources exist; the supplied --source-id is invalid.'
 
-    printf 'No acquisition source is registered yet.\n'
+    printf 'No utility is registered yet.\n'
     printf 'Enter the utility providing the XML and how you got it.\n'
     read -r -p 'Utility name (e.g., SDG&E): ' utility || exit 2
     read -r -p 'Source label (e.g., Green Button Download): ' \
@@ -322,8 +322,7 @@ if ((${#source_records[@]} == 0)); then
         die 'Invalid source name.'
 
     printf 'Utility: %s\nSource: %s\n' "$utility" "$source_name"
-    printf 'Declining registration cancels the import.\n'
-    if ! confirm 'Register this acquisition source?'; then
+    if ! confirm 'Register this utility and import method?'; then
         printf 'Cancelled: no database import attempted.\n'
         exit 0
     fi
@@ -402,9 +401,102 @@ IFS=$'\t' read -r source_id utility source_name <<< "$selected"
 printf 'Import destination:\n'
 printf '  Utility: %s\n' "$utility"
 printf '  Acquisition source: %s\n' "$source_name"
-printf '  Selection: %s — %s (source ID %s)\n' \
-    "$utility" "$source_name" "$source_id"
-printf 'All selected XML files must belong to this source.\n'
+printf '  Selected: %s — %s\n' \
+    "$utility" "$source_name"
+
+# Database IDs are internal. Never print them during guided onboarding.
+run_readonly_sql() {
+    local query="$1"
+    "${compose[@]}" exec -T mariadb sh -c '
+        export MYSQL_PWD="$(cat /run/secrets/energy_db_pwd)"
+        exec mariadb --batch --skip-column-names \
+            -u "$MARIADB_USER" "$MARIADB_DATABASE"
+    ' <<< "$query"
+}
+
+source_custodian_id="$(run_readonly_sql "
+    SELECT data_custodian_id FROM acquisition_source
+    WHERE id = $source_id;
+")"
+[[ "$source_custodian_id" =~ ^[1-9][0-9]*$ ]] ||
+    die 'Cannot resolve utility for meter registration.'
+
+# Register customer-defined physical meters before the import transaction.
+# Do not infer meter identity or commodity from XML filenames.
+register_meters() {
+    local kind="$1" code="$2" label="$3"
+    local rows count id name meter_id name_hex
+
+    printf '\n%s meter registration\n' "$label"
+    printf '%s\n' '--------------------------'
+    rows="$(run_readonly_sql "
+        SELECT id, display_name FROM physical_meter
+        WHERE data_custodian_id = $source_custodian_id
+          AND commodity = $code ORDER BY id;
+    ")" || die 'Cannot list registered meters.'
+    count=0
+    if [[ -n "$rows" ]]; then
+        while IFS=$'\t' read -r id name; do
+            [[ "$id" =~ ^[1-9][0-9]*$ ]] ||
+                die 'Invalid meter record.'
+            printf '  Existing meter: %s\n' "$name"
+            count=$((count + 1))
+        done <<< "$rows"
+    fi
+    if ((count == 0)); then
+        if ! confirm "Register a $label meter for this utility?"; then
+            printf 'Skipped %s registration.\n' "$label"
+            return 0
+        fi
+    else
+        printf '%s registered %s meter(s).\n' "$count" "$label"
+        if ! confirm "Register another $label meter?"; then
+            return 0
+        fi
+    fi
+
+    while :; do
+        read -r -p "Friendly $label meter name: " name ||
+            die 'Meter registration cancelled.'
+        [[ -n "${name//[[:space:]]/}" && ${#name} -le 255 ]] ||
+            die 'Provide a friendly meter name (up to 255 characters).'
+        printf 'Register %s meter: %s\n' "$label" "$name"
+        confirm 'Create this meter?' ||
+            die 'Meter registration declined; import not started.'
+        "$SCRIPT_DIR/meter-prod.sh" create \
+            --custodian "$source_custodian_id" \
+            --kind "$kind" --name "$name" >/dev/null ||
+            die 'Could not create meter.'
+        # Determine the record by customer-provided unique name.
+        # Do not ask the customer to handle database IDs.
+        name_hex="$(printf %s "$name" | od -An -tx1 | tr -d ' \n')"
+        rows="$(run_readonly_sql "
+            SELECT id FROM physical_meter
+            WHERE data_custodian_id = $source_custodian_id
+              AND commodity = $code
+              AND display_name =
+                  CONVERT(UNHEX('$name_hex') USING utf8mb4);
+        ")" || die 'Cannot verify new meter.'
+        [[ "$rows" =~ ^[1-9][0-9]*$ ]] ||
+            die 'Cannot uniquely identify newly registered meter.'
+        meter_id="$rows"
+        printf 'Enter the actual number from your utility records.\n'
+        "$SCRIPT_DIR/meter-prod.sh" set-number --meter "$meter_id" ||
+            die 'Utility meter number was not saved.'
+        printf '%s meter registered.\n' "$label"
+        if ! confirm "Register another $label meter?"; then
+            break
+        fi
+    done
+}
+
+printf '\nUtility and physical-meter registration\n'
+printf '%s\n' '---------------------------------------'
+printf 'Utility: %s\n' "$utility"
+printf 'Import method: %s\n' "$source_name"
+printf 'Use actual meter numbers from your utility records.\n'
+register_meters electric 1 Electricity
+register_meters gas 7 'Natural gas'
 
 # Confirm the database operation separately from filesystem access.
 printf '\nAccess verified. Ready to import %s files.\n' \
@@ -428,31 +520,14 @@ done
 # Physical-meter association is required to complete guided onboarding.
 # The user confirms identity. Matching consumption values alone never
 # establish that two resources came from the same physical meter.
-run_readonly_sql() {
-    local query="$1"
-
-    "${compose[@]}" exec -T mariadb sh -c '
-        export MYSQL_PWD="$(cat /run/secrets/energy_db_pwd)"
-        exec mariadb --batch --skip-column-names \
-            -u "$MARIADB_USER" "$MARIADB_DATABASE"
-    ' <<< "$query"
-}
-
-# All identifiers in these queries originate from validated database IDs.
-# Output contains only internal IDs and friendly labels; no raw usage.
-source_custodian_id="$(run_readonly_sql "
-    SELECT data_custodian_id FROM acquisition_source
-    WHERE id = $source_id;
-")"
-[[ "$source_custodian_id" =~ ^[1-9][0-9]*$ ]] ||
-    die 'Cannot resolve utility for meter registration.'
-
-printf '\nPhysical-meter setup (required)\n'
+printf '\n\nPhysical-meter setup (required)\n'
+printf '%s\n' '--------------------------------'
+printf 'Use the meter numbers shown on utility records.\n'
 printf 'Utility: %s — %s\n' "$utility" "$source_name"
-printf 'Imported Green Button resources must be assigned to the\n'
+printf 'Imported XML file data must be assigned to the\n'
 printf 'correct physical meter before usage is ready for display.\n'
 printf 'This step requires customer confirmation of meter identity.\n'
-printf 'Supported kinds: electricity and natural gas only.\n'
+printf '\n'
 
 # Query unassigned resources for the selected acquisition source,
 # broken down by commodity. Unsupported kinds must be reviewed.
@@ -476,73 +551,43 @@ unassigned_summary() {
 # attach-compatible is unsafe: it would mix separate physical meters.
 setup_kind() {
     local kind="$1" code="$2" label="$3" count="$4"
-    local meter_rows meter_id meter_count id display_name answer
-
+    local rows meter_id meter_count id display_name
     [[ "$count" =~ ^[0-9]+$ ]] || die 'Invalid resource count.'
     ((count > 0)) || return 0
 
-    printf '\n%s: %s unassociated resource(s)\n' "$label" "$count"
-    meter_rows="$(run_readonly_sql "
+    printf '\n%s file data association\n' "$label"
+    printf '%s\n' '-----------------------------'
+    printf 'Unassociated file data entries: %s\n' "$count"
+    rows="$(run_readonly_sql "
         SELECT id, display_name FROM physical_meter
         WHERE data_custodian_id = $source_custodian_id
           AND commodity = $code ORDER BY id;
     ")" || die 'Unable to list physical meters.'
-
     meter_count=0
     meter_id=''
-    if [[ -n "$meter_rows" ]]; then
+    if [[ -n "$rows" ]]; then
         while IFS=$'\t' read -r id display_name; do
             [[ "$id" =~ ^[1-9][0-9]*$ ]] ||
-                die 'Invalid physical meter ID returned.'
-            printf '  %s — %s\n' "$id" "$display_name"
+                die 'Invalid meter record.'
+            printf '  Registered meter: %s\n' "$display_name"
             meter_count=$((meter_count + 1))
             meter_id="$id"
-        done <<< "$meter_rows"
+        done <<< "$rows"
     fi
-
     if ((meter_count == 0)); then
-        printf 'No %s physical meter is registered.\n' "$label"
-        read -r -p "Enter a friendly $label meter label: " answer ||
-            die 'Meter setup cancelled.'
-        [[ -n "${answer//[[:space:]]/}" ]] ||
-            die 'A physical-meter label is required.'
-        [[ ${#answer} -le 255 ]] || die 'Meter label is too long.'
-        printf 'Register %s meter: %s\n' "$label" "$answer"
-        confirm 'Create this physical-meter profile?' ||
-            die 'Meter setup declined; onboarding incomplete.'
-        "$SCRIPT_DIR/meter-prod.sh" create \
-            --custodian "$source_custodian_id" \
-            --kind "$kind" --name "$answer" ||
-            die 'Meter creation failed; onboarding incomplete.'
-        meter_rows="$(run_readonly_sql "
-            SELECT id FROM physical_meter
-            WHERE data_custodian_id = $source_custodian_id
-              AND commodity = $code
-            ORDER BY id;
-        ")"
-        [[ "$meter_rows" =~ ^[1-9][0-9]*$ ]] ||
-            die 'Verify the newly created meter before continuing.'
-        meter_id="$meter_rows"
-    elif ((meter_count > 1)); then
-        printf 'Multiple %s meters exist.\n' "$label"
-        printf 'Automatic compatible association could mix meters.\n'
-        printf 'Use meter-prod.sh attach for each confirmed resource.\n'
-        die 'Meter association requires individual review.'
-    else
-        printf 'One %s meter found (ID %s).\n' "$label" "$meter_id"
+        die "Register a $label meter before associating resources."
     fi
-
-    printf 'Confirm all %s resources for this utility belong to\n' \
-        "$label"
-    printf 'the same physical meter (ID %s).\n' "$meter_id"
-    confirm 'Confirm identity and preview compatible resources?' ||
-        die 'Association declined; onboarding incomplete.'
-
-    # The wrapper shows its preview and requests another affirmative
-    # confirmation before applying any association in the database.
+    if ((meter_count > 1)); then
+        printf 'More than one %s meter is registered.\n' "$label"
+        printf 'No automatic associations will be made.\n'
+        printf 'Use meter-prod.sh to review individual file data entries.\n'
+        die 'Individual meter association is required.'
+    fi
+    printf 'Review the imported file data before confirming association.\n'
+    printf 'An XML file may contain multiple data entries.\n'
     "$SCRIPT_DIR/meter-prod.sh" attach-compatible \
         --meter "$meter_id" ||
-        die 'Meter association failed; onboarding incomplete.'
+        die 'Meter association failed; import is preserved.'
 }
 
 summary="$(unassigned_summary)" ||
@@ -570,11 +615,10 @@ setup_kind gas 7 'Natural gas' "$gas_count"
 remaining="$(unassigned_summary)" ||
     die 'Unable to verify resource mapping.'
 if [[ -n "$remaining" ]]; then
-    printf '\nSome resources remain unassociated:\n%s\n' "$remaining"
+    printf '\nSome imported file data remains unassociated:\n%s\n' "$remaining"
     die 'Onboarding incomplete. Resolve meter associations before usage.'
 fi
 
-printf '\nImport and meter association completed.\n'
-printf 'All resources from acquisition source %s are mapped.\n' \
-    "$source_id"
+printf '\n\nImport and meter association completed.\n'
+printf 'All imported file data is associated with meters.\n'
 printf 'Stream validation is still required before using totals.\n'

@@ -120,6 +120,16 @@ run_check "Markdown documentation" "$MARKDOWN_OUTPUT" \
     python3 scripts/check-docs.py --strict-metadata
 markdown_result="PASS"
 
+# Validate the shipped customer ZIP and fail-closed CLI entry behavior.
+PACKAGE_OUTPUT="$TEMP_DIR/package.txt"
+GUIDED_OUTPUT="$TEMP_DIR/guided-import.txt"
+run_check "Production installer package" "$PACKAGE_OUTPUT" \
+    bash scripts/check-prod-package.sh 0.1.4
+run_check "Guided import entry checks" "$GUIDED_OUTPUT" \
+    bash scripts/test-guided-import-entry.sh
+run_check "Guided meter selection" "$GUIDED_OUTPUT" \
+    bash scripts/test-guided-meter-selection.sh
+
 adr_count=$(
     awk -F: '/^ADRs found:/ {
         gsub(/[[:space:]]/, "", $2)
@@ -216,6 +226,9 @@ echo
 printf "Verification passed: %s tests; formatting: %s; ADR errors: %s.\n" \
     "$tests_passed" "$fmt_result" "$adr_errors"
 echo "Markdown documentation: $markdown_result"
+echo "Production installer package: PASS"
+echo "Guided import entry checks: PASS"
+echo "Guided meter selection: PASS"
 echo "Updated $STATUS_FILE"
 echo "Updated $HISTORY_FILE"
 printf "Verification elapsed: %ss\n" \
