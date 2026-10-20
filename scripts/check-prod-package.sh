@@ -3,17 +3,23 @@
 # Validate the actual customer installation archive before publication.
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-version="${1:-0.1.4}"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-    printf 'Expected semantic version X.Y.Z\n' >&2
+[[ $# -eq 1 ]] || {
+    echo "Usage: $0 VERSION" >&2
     exit 2
 }
+version="$1"
+[[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.[1-9][0-9]*)?$ ]] || {
+    printf 'Expected version X.Y.Z or X.Y.Z-rc.N\n' >&2
+    exit 2
+}
+image="${ENGY_RELEASE_IMAGE:-docker.io/pmelendez2/gb-energy-ingest:$version}"
+[[ "$image" == *":$version" ]] || exit 2
 out="$(mktemp -d)"
 trap 'rm -rf -- "$out"' EXIT
 bash "$root/scripts/package-prod-release.sh" "$version" "$out"
 archive="$out/energy-ingest-prod-${version}.zip"
 ( cd "$out" && sha256sum -c "${archive##*/}.sha256" )
-python3 - "$archive" "$version" <<'PY'
+python3 - "$archive" "$version" "$image" <<'PY'
 # SPDX-License-Identifier: MIT
 import pathlib
 import subprocess
@@ -22,6 +28,7 @@ import zipfile
 
 archive = pathlib.Path(sys.argv[1])
 version = sys.argv[2]
+image = sys.argv[3]
 required = {
     'docs/INSTALLATION.md',
     'docs/INSTALL_LINUX.md',
@@ -68,10 +75,7 @@ with zipfile.ZipFile(archive) as z:
                 raise SystemExit(f'Invalid shell script header: {name}')
             subprocess.run(['bash', '-n'], input=contents, check=True)
     settings = z.read('deploy/docker-compose/.env.prod.example').decode()
-    expected_image = (
-        'ENGY_APP_IMAGE=docker.io/pmelendez2/'
-        f'gb-energy-ingest:{version}'
-    )
+    expected_image = 'ENGY_APP_IMAGE=' + image
     if expected_image not in settings.splitlines():
         raise SystemExit('Package refers to wrong production image version')
     for doc in ('docs/INSTALLATION.md', 'docs/INSTALL_LINUX.md'):

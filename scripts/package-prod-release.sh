@@ -10,7 +10,9 @@ usage() {
 [[ $# -eq 2 ]] || usage
 version="$1"
 out_dir="$2"
-[[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || usage
+[[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.[1-9][0-9]*)?$ ]] || usage
+image="${ENGY_RELEASE_IMAGE:-docker.io/pmelendez2/gb-energy-ingest:$version}"
+[[ "$image" == *":$version" ]] || usage
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$out_dir"
 out_dir="$(cd "$out_dir" && pwd)"
@@ -46,7 +48,7 @@ done
 # Avoid exposing host-local runtime files, raw XML, or Git metadata.
 # zipfile writes fixed timestamps for reproducible archives.
 RELEASE_ROOT="$root" RELEASE_OUT="$out_dir/$archive" \
-RELEASE_VERSION="$version" python3 - "${files[@]}" <<'PY'
+RELEASE_VERSION="$version" RELEASE_IMAGE="$image" python3 - "${files[@]}" <<'PY'
 import os
 import pathlib
 import sys
@@ -55,6 +57,7 @@ import zipfile
 root = pathlib.Path(os.environ['RELEASE_ROOT'])
 target = pathlib.Path(os.environ['RELEASE_OUT'])
 version = os.environ['RELEASE_VERSION']
+image = os.environ['RELEASE_IMAGE']
 script_paths = set(sys.argv[1:])
 with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as z:
     for name in sorted(script_paths):
@@ -65,9 +68,7 @@ with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as z:
             for i, line in enumerate(lines):
                 if line.startswith('ENGY_APP_IMAGE='):
                     lines[i] = (
-                        'ENGY_APP_IMAGE='
-                        'docker.io/pmelendez2/gb-energy-ingest:'
-                        + version + '\n'
+                        'ENGY_APP_IMAGE=' + image + '\n'
                     )
                     found = True
             if not found:
