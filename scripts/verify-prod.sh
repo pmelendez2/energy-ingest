@@ -77,6 +77,21 @@ else
     fi
 fi
 
+# Check the HTTP endpoint, not just the container running state.
+if [[ -s prod-secrets/ha_energy_dev_api_token ]]; then
+    pass 'Home Assistant API token file present'
+else
+    fail 'Home Assistant API token missing'
+fi
+if command -v curl >/dev/null 2>&1; then
+    code="$(curl -sS -o /dev/null -w '%{http_code}' \
+        --max-time 5 http://127.0.0.1:8080/v1/meters)" || code=000
+    [[ "$code" == 401 ]] && pass 'API rejects anonymous requests' || \
+        fail "Local HTTP API not reachable/authenticated: $code"
+else
+    fail 'curl required to verify HTTP API'
+fi
+
 if (( errors > 0 )); then
     printf '\nVerification found %s problem(s).\n' "$errors" >&2
     exit 1

@@ -23,6 +23,10 @@ COMPOSE=(
     --env-file "$ENV_FILE"
     -f compose.prod.yml
 )
+# Use the same Compose files for API setup and verification.
+# shellcheck source=scripts/prod-api-common.sh
+source "$SCRIPT_DIR/prod-api-common.sh"
+
 
 die() {
     printf 'Error: %s\n' "$*" >&2
@@ -259,6 +263,45 @@ create_missing_local_files() {
     fi
 }
 
+start_api_and_provision_token() {
+    engy_api_compose
+    "${ENGY_API_COMPOSE[@]}" --profile api up -d api
+
+    # Never rotate an existing working HA token on repeat setup.
+    local token_path="$SECRETS_DIR/ha_energy_dev_api_token"
+    if [[ -s "$token_path" ]]; then
+        chmod 600 "$token_path"
+        printf 'Home Assistant API token: already provisioned.\n'
+    else
+        local temp
+        umask 077
+        temp="$(mktemp "$SECRETS_DIR/.ha-token.XXXXXXXX")"
+        if ! "${ENGY_API_COMPOSE[@]}" --profile maintenance \
+            run --rm admin api-token create ha-energy-dev >"$temp"; then
+            rm -f "$temp"
+            die 'Failed to provision Home Assistant token.'
+        fi
+        # The CLI prints just one opaque token to stdout.
+        if ! grep -Eq '^ei_[A-Za-z0-9_-]+$' "$temp" || \
+            [[ "$(wc -l <"$temp")" -ne 1 ]]; then
+            rm -f "$temp"
+            die 'Unexpected token response; verify API clients before retry.'
+        fi
+        chmod 600 "$temp"
+        mv -n -- "$temp" "$token_path"
+        rm -f "$temp"
+        printf 'Home Assistant API token: securely saved.\n'
+    fi
+    printf 'HA API token file: %s/%s\n' "$PWD" "$token_path"
+    printf 'HA API URL (local): http://127.0.0.1:8080\n'
+    if [[ -n "${ENGY_API_LAN_BIND_IP:-}" ]]; then
+        printf 'HA API URL (LAN): http://%s:%s\n' \
+            "$ENGY_API_LAN_BIND_IP" "${ENGY_API_PORT:-8080}"
+    else
+        printf 'For remote HA, set ENGY_API_LAN_BIND_IP in .env.prod.\n'
+    fi
+}
+
 first_setup() {
     cat <<EOF
 
@@ -284,6 +327,7 @@ EOF
     start_database
     wait_healthy
     migrate_database
+    start_api_and_provision_token
     summary
 }
 
@@ -292,6 +336,7 @@ continue_environment() {
     start_database
     wait_healthy
     migrate_database
+    start_api_and_provision_token
     summary
 }
 
@@ -314,6 +359,7 @@ EOF
     "${COMPOSE[@]}" up -d --force-recreate mariadb
     wait_healthy
     migrate_database
+    start_api_and_provision_token
     summary
 }
 
@@ -353,6 +399,8 @@ EOF
     start_database
     wait_healthy
     migrate_database
+    rm -f "$SECRETS_DIR/ha_energy_dev_api_token"
+    start_api_and_provision_token
     summary
 }
 

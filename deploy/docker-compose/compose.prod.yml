@@ -87,6 +87,7 @@ services:
       - "${ENGY_API_BIND_IP:-127.0.0.1}:${ENGY_API_PORT:-8080}:8080"
     networks:
       - energy-db
+      - energy-api
 
   admin:
     profiles: ["maintenance"]
@@ -106,6 +107,9 @@ volumes:
 networks:
   energy-db:
     internal: true
+  energy-api:
+    driver: bridge
+    internal: false
 
 secrets:
   energy_db_pwd:

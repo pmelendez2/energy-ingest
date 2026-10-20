@@ -17,6 +17,7 @@ out_dir="$(cd "$out_dir" && pwd)"
 archive="energy-ingest-prod-${version}.zip"
 files=(
   scripts/setup-prod.sh
+  scripts/prod-api-common.sh
   scripts/verify-prod.sh
   scripts/register-prod.sh
   scripts/import-prod.sh
@@ -24,6 +25,7 @@ files=(
   scripts/meter-prod.sh
   scripts/analyze-prod-data.sh
   deploy/docker-compose/compose.prod.yml
+  deploy/docker-compose/compose.api-lan.yml
   deploy/docker-compose/.env.prod.example
   deploy/docker-compose/10-runtime-grants.sh
   deploy/docker-compose/bootstrap-prod.sh
