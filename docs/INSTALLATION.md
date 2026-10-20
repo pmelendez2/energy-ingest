@@ -116,3 +116,26 @@ The separate `ha_energy_usage` Home Assistant integration is not part of
 this backend installer. It communicates through the authenticated Energy
 Ingest API; Home Assistant never connects directly to MariaDB. The HA
 integration's installation and runtime validation are a separate stage.
+
+## Home Assistant API setup (production)
+
+The production setup script starts the authenticated API and provisions a
+unique `ha-energy-dev` client token on first setup. It stores the secret at
+`deploy/docker-compose/prod-secrets/ha_energy_dev_api_token` with mode 0600.
+Do not commit, publish or paste the token. Re-running setup preserves it.
+
+For remote Home Assistant, edit `.env.prod` and add:
+
+```dotenv
+ENGY_API_LAN_BIND_IP=192.168.1.115
+```
+
+Replace the example with the host's actual LAN IP. Re-run setup and verify
+with `scripts/verify-prod.sh`. The API keeps its `127.0.0.1:8080` binding
+and adds the configured LAN IP. Port 8080 must not be forwarded by your router;
+HTTP tokens are unencrypted on the LAN. Prefer TLS and firewall restrictions
+for deployments outside a trusted network.
+
+The token stored by the installer is separate from credentials manually
+created by earlier releases. If upgrading an installation that already has a
+valid HA token, retain and use the prior token rather than rotating it.

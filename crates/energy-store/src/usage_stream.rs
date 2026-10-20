@@ -45,6 +45,7 @@ pub struct SelectedInterval {
 pub enum StreamIssueKind {
     MissingAcceptedRevision,
     IncompleteMeasurementType,
+    UnsupportedElectricityFlow,
     IncompatibleMeasurementType,
     ConflictingDuplicate,
     OverlappingIntervals,
@@ -259,6 +260,18 @@ pub fn resolve_candidates(
             continue;
         };
         let metadata: [i64; 8] = metadata.try_into().expect("eight fields");
+        // Grid exports and ambiguous electricity flow are not consumption.
+        // Retain the raw observations in storage for a future export API.
+        if candidate.commodity == Some(1) && candidate.flow_direction != Some(1)
+        {
+            issue(
+                &mut result,
+                StreamIssueKind::UnsupportedElectricityFlow,
+                candidate.interval_reading_id,
+                None,
+            );
+            continue;
+        }
         if let Some(first) = signature {
             if first != metadata {
                 issue(

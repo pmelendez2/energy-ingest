@@ -131,6 +131,7 @@ fn issue_name(kind: energy_store::StreamIssueKind) -> &'static str {
     match kind {
         K::MissingAcceptedRevision => "missing_accepted_revision",
         K::IncompleteMeasurementType => "incomplete_measurement_type",
+        K::UnsupportedElectricityFlow => "unsupported_electricity_flow",
         K::IncompatibleMeasurementType => "incompatible_measurement_type",
         K::ConflictingDuplicate => "conflicting_duplicate",
         K::OverlappingIntervals => "overlapping_intervals",
