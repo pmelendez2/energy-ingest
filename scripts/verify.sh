@@ -124,7 +124,7 @@ markdown_result="PASS"
 PACKAGE_OUTPUT="$TEMP_DIR/package.txt"
 GUIDED_OUTPUT="$TEMP_DIR/guided-import.txt"
 run_check "Production installer package" "$PACKAGE_OUTPUT" \
-    bash scripts/check-prod-package.sh 0.1.4
+    bash scripts/test-prod-release-versions.sh
 run_check "Guided import entry checks" "$GUIDED_OUTPUT" \
     bash scripts/test-guided-import-entry.sh
 run_check "Guided meter selection" "$GUIDED_OUTPUT" \
@@ -226,7 +226,7 @@ echo
 printf "Verification passed: %s tests; formatting: %s; ADR errors: %s.\n" \
     "$tests_passed" "$fmt_result" "$adr_errors"
 echo "Markdown documentation: $markdown_result"
-echo "Production installer package: PASS"
+echo "Production release version regression: PASS"
 echo "Guided import entry checks: PASS"
 echo "Guided meter selection: PASS"
 echo "Updated $STATUS_FILE"

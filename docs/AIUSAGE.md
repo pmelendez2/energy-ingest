@@ -48,7 +48,48 @@ changes in annotations or the applicable release history.
 
 | Release | AI Tool | Model | Date Range |
 |---|---|---|---|
+| 0.1.5-rc.1 | ChatGPT | GPT-6 | 2026-10-20 |
 | Unreleased / 0.1.0-dev | ChatGPT | GPT-5.6 Sol | 2026-09-28 - present |
+
+### 0.1.5-rc.1
+
+* AI Tool: ChatGPT
+* Model: GPT-6
+* Date Range: 2026-10-20
+* Maintainer Review: Required
+
+#### Areas of AI assistance
+
+AI assistance was used for:
+
+- extending production package version validation to support prerelease versions;
+- making release image references configurable;
+- preserving compatibility with existing stable-release packaging;
+- developing the private Docker registry publication workflow;
+- implementing registry authentication and tag-existence safeguards;
+- developing automated regression tests for release versions and registry behavior;
+- preparing private release-candidate documentation.
+
+#### Verification
+
+The maintainer executed the following checks:
+
+- shell syntax validation;
+- production package generation and SHA-256 verification;
+- stable and prerelease version regression tests;
+- private registry safety regression tests;
+- Markdown documentation metadata validation;
+- full isolated development verification, including 150 passing tests;
+- Git whitespace and executable-permission checks.
+
+Final verification of Docker image publication, multi-platform manifests,
+private registry access, and production deployment remains pending.
+
+#### Maintenance
+
+The release candidate requires maintainer review, successful CI checks,
+and approval before publication. The existing stable Docker Hub release
+workflow remains separate from private release-candidate publication.
 
 ### Unreleased / 0.1.0-dev
 
