@@ -71,6 +71,80 @@ pub struct StreamResolution {
     pub issues: Vec<StreamIssue>,
 }
 
+/// Stable schema revision for the canonical meter-validation summary.
+pub const VALIDATION_CONTRACT_VERSION: u32 = 1;
+
+/// Validation state shared by CLI and API consumers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValidationStatus {
+    NoData,
+    Validated,
+    Unresolved,
+}
+
+impl ValidationStatus {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NoData => "no_data",
+            Self::Validated => "validated",
+            Self::Unresolved => "unresolved",
+        }
+    }
+}
+
+impl StreamIssueKind {
+    /// Machine-readable identifier shared by all presentation surfaces.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::MissingAcceptedRevision => "missing_accepted_revision",
+            Self::IncompleteMeasurementType => "incomplete_measurement_type",
+            Self::UnsupportedElectricityFlow => "unsupported_electricity_flow",
+            Self::IncompatibleMeasurementType => {
+                "incompatible_measurement_type"
+            }
+            Self::ConflictingDuplicate => "conflicting_duplicate",
+            Self::OverlappingIntervals => "overlapping_intervals",
+            Self::InvalidDuration => "invalid_duration",
+        }
+    }
+}
+
+/// Deterministic summary of a physical meter's existing stream resolution.
+///
+/// No totals, inferred gaps, or partial intervals are exposed. The summary
+/// is not a global change cursor or a snapshot-consistent revision token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MeterValidation {
+    pub contract_version: u32,
+    pub physical_meter_id: u64,
+    pub status: ValidationStatus,
+    pub candidate_count: usize,
+    pub selected_interval_count: usize,
+    pub issues: Vec<StreamIssue>,
+}
+
+/// Derive canonical validation facts from the same result used by the API.
+pub fn summarize_meter_validation(
+    physical_meter_id: u64,
+    result: &StreamResolution,
+) -> MeterValidation {
+    let status = if !result.issues.is_empty() {
+        ValidationStatus::Unresolved
+    } else if result.candidate_count == 0 {
+        ValidationStatus::NoData
+    } else {
+        ValidationStatus::Validated
+    };
+    MeterValidation {
+        contract_version: VALIDATION_CONTRACT_VERSION,
+        physical_meter_id,
+        status,
+        candidate_count: result.candidate_count,
+        selected_interval_count: result.intervals.len(),
+        issues: result.issues.clone(),
+    }
+}
+
 /// Loads accepted observations for explicitly attached resources.
 ///
 /// The query never joins rejected revisions and never mutates storage.
@@ -343,4 +417,80 @@ fn issue(
         interval_reading_id,
         other_interval_reading_id,
     });
+}
+
+#[cfg(test)]
+mod validation_contract_tests {
+    use super::*;
+
+    #[test]
+    fn empty_stream_is_not_validated() {
+        let summary =
+            summarize_meter_validation(2, &StreamResolution::default());
+        assert_eq!(summary.contract_version, 1);
+        assert_eq!(summary.physical_meter_id, 2);
+        assert_eq!(summary.status.as_str(), "no_data");
+        assert_eq!(summary.selected_interval_count, 0);
+    }
+
+    #[test]
+    fn validated_stream_only_counts_selected_intervals() {
+        let sample = SelectedInterval {
+            start: NaiveDateTime::parse_from_str(
+                "2026-01-01T00:00:00",
+                "%Y-%m-%dT%H:%M:%S",
+            )
+            .unwrap(),
+            duration_seconds: 3600,
+            raw_value: 25,
+            meter_reading_id: 1,
+            accepted_revision_id: 3,
+            power_of_ten_multiplier: 0,
+            unit_of_measure: 72,
+        };
+        let resolution = StreamResolution {
+            candidate_count: 2,
+            intervals: vec![sample],
+            issues: Vec::new(),
+        };
+        let summary = summarize_meter_validation(5, &resolution);
+        assert_eq!(summary.status, ValidationStatus::Validated);
+        assert_eq!(summary.candidate_count, 2);
+        assert_eq!(summary.selected_interval_count, 1);
+    }
+
+    #[test]
+    fn unresolved_stream_does_not_certify_partial_intervals() {
+        let resolution = StreamResolution {
+            candidate_count: 2,
+            intervals: Vec::new(),
+            issues: vec![StreamIssue {
+                kind: StreamIssueKind::ConflictingDuplicate,
+                interval_reading_id: 9,
+                other_interval_reading_id: Some(8),
+            }],
+        };
+        let summary = summarize_meter_validation(5, &resolution);
+        assert_eq!(summary.status, ValidationStatus::Unresolved);
+        assert_eq!(summary.selected_interval_count, 0);
+        assert_eq!(summary.issues[0].kind.as_str(), "conflicting_duplicate");
+    }
+
+    #[test]
+    fn all_issue_names_stable() {
+        let kinds = [
+            StreamIssueKind::MissingAcceptedRevision,
+            StreamIssueKind::IncompleteMeasurementType,
+            StreamIssueKind::UnsupportedElectricityFlow,
+            StreamIssueKind::IncompatibleMeasurementType,
+            StreamIssueKind::ConflictingDuplicate,
+            StreamIssueKind::OverlappingIntervals,
+            StreamIssueKind::InvalidDuration,
+        ];
+        let mut names = std::collections::HashSet::new();
+        for kind in kinds {
+            assert!(names.insert(kind.as_str()));
+            assert!(!kind.as_str().is_empty());
+        }
+    }
 }

@@ -7,7 +7,8 @@
 
 use energy_store::{
     DataCustodianId, create_acquisition_source, create_data_custodian,
-    get_data_custodian, get_source_by_name,
+    get_data_custodian, get_source_by_name, resolve_physical_meter_stream,
+    summarize_meter_validation,
 };
 use sqlx::mysql::MySqlPoolOptions;
 use std::{
@@ -32,6 +33,7 @@ Usage:
   energy-store-admin meter attach METER_ID RESOURCE_ID
   energy-store-admin meter attach-compatible METER_ID [--apply]
   energy-store-admin meter resources METER_ID
+  energy-store-admin meter validate METER_ID
   energy-store-admin --help
 
 Environment:
@@ -60,6 +62,7 @@ enum Command {
     MeterAttach(u64, u64),
     MeterAttachCompatible(u64, bool),
     MeterResources(u64),
+    MeterValidate(u64),
 }
 
 fn parse_id(value: &str) -> Result<u64, String> {
@@ -142,6 +145,9 @@ fn parse(args: &[String]) -> Result<Command, String> {
                 && flag == "--apply" =>
         {
             Ok(Command::MeterAttachCompatible(parse_id(id)?, true))
+        }
+        [a, b, id] if a == "meter" && b == "validate" => {
+            Ok(Command::MeterValidate(parse_id(id)?))
         }
         [a, b, id] if a == "meter" && b == "resources" => {
             Ok(Command::MeterResources(parse_id(id)?))
@@ -445,6 +451,13 @@ async fn execute(args: &[String]) -> Result<(), String> {
         Command::MeterAttachCompatible(meter, apply) => {
             attach_compatible(&pool, meter, apply).await?;
         }
+        Command::MeterValidate(meter) => {
+            let result = resolve_physical_meter_stream(&pool, meter)
+                .await
+                .map_err(|_| "meter validation failed")?;
+            let summary = summarize_meter_validation(meter, &result);
+            print!("{}", format_meter_validation(&summary));
+        }
         Command::MeterResources(meter) => {
             let ids: Vec<(u64,)> = sqlx::query_as(
                 "SELECT meter_reading_id FROM physical_meter_resource \
@@ -466,6 +479,29 @@ async fn execute(args: &[String]) -> Result<(), String> {
         Command::Help | Command::Bootstrap => unreachable!(),
     }
     Ok(())
+}
+
+/// Presentation only; validation decisions come from energy-store.
+fn format_meter_validation(summary: &energy_store::MeterValidation) -> String {
+    use std::fmt::Write;
+    let mut text = String::new();
+    writeln!(text, "Contract version: {}", summary.contract_version).unwrap();
+    writeln!(text, "Physical meter ID: {}", summary.physical_meter_id).unwrap();
+    writeln!(text, "Status: {}", summary.status.as_str()).unwrap();
+    writeln!(text, "Candidates: {}", summary.candidate_count).unwrap();
+    writeln!(text, "Selected intervals: {}", summary.selected_interval_count)
+        .unwrap();
+    for issue in &summary.issues {
+        writeln!(
+            text,
+            "Issue: {} interval={} other={:?}",
+            issue.kind.as_str(),
+            issue.interval_reading_id,
+            issue.other_interval_reading_id
+        )
+        .unwrap();
+    }
+    text
 }
 
 /// Preview or atomically associate unambiguous, compatible resources.
@@ -791,6 +827,23 @@ mod tests {
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|v| (*v).to_owned()).collect()
+    }
+
+    #[test]
+    fn canonical_meter_validation_command() {
+        assert_eq!(
+            parse(&args(&["meter", "validate", "5"])),
+            Ok(Command::MeterValidate(5))
+        );
+        assert!(parse(&args(&["meter", "validate", "0"])).is_err());
+        let summary = energy_store::summarize_meter_validation(
+            5,
+            &energy_store::StreamResolution::default(),
+        );
+        let text = super::format_meter_validation(&summary);
+        assert!(text.contains("Contract version: 1"));
+        assert!(text.contains("Status: no_data"));
+        assert!(text.contains("Physical meter ID: 5"));
     }
 
     #[test]
