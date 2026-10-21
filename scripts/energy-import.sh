@@ -444,10 +444,8 @@ register_meters() {
         done <<< "$rows"
     fi
     if ((count == 0)); then
-        if ! confirm "Register a $label meter for this utility?"; then
-            printf 'Skipped %s registration.\n' "$label"
-            return 0
-        fi
+        printf 'No %s meter registered yet.\n' "$label"
+        printf 'Enter meter details, or leave the name blank to skip.\n'
     else
         printf '%s registered %s meter(s).\n' "$count" "$label"
         if ! confirm "Register another $label meter?"; then
@@ -458,11 +456,27 @@ register_meters() {
     while :; do
         read -r -p "Friendly $label meter name: " name ||
             die 'Meter registration cancelled.'
-        [[ -n "${name//[[:space:]]/}" && ${#name} -le 255 ]] ||
+        if [[ -z "${name//[[:space:]]/}" ]]; then
+            if ((count == 0)); then
+                printf 'No %s meter registered.\n' "$label"
+            fi
+            return 0
+        fi
+        [[ ${#name} -le 255 ]] ||
             die 'Provide a friendly meter name (up to 255 characters).'
-        printf 'Register %s meter: %s\n' "$label" "$name"
-        confirm 'Create this meter?' ||
-            die 'Meter registration declined; import not started.'
+        local number
+        read -r -p 'Utility meter number: ' number ||
+            die 'Meter registration cancelled.'
+        [[ -n "${number//[[:space:]]/}" && ${#number} -le 255 ]] ||
+            die 'Provide a valid utility meter number.'
+        printf '\nReview %s meter\n' "$label"
+        printf '  Name: %s\n' "$name"
+        printf '  Utility meter number: %s\n' "$number"
+        if ! confirm 'Save this meter and its number?'; then
+            unset number
+            printf 'Meter registration cancelled.\n'
+            return 0
+        fi
         "$SCRIPT_DIR/meter-prod.sh" create \
             --custodian "$source_custodian_id" \
             --kind "$kind" --name "$name" >/dev/null ||
@@ -480,9 +494,14 @@ register_meters() {
         [[ "$rows" =~ ^[1-9][0-9]*$ ]] ||
             die 'Cannot uniquely identify newly registered meter.'
         meter_id="$rows"
-        printf 'Enter the actual number from your utility records.\n'
-        "$SCRIPT_DIR/meter-prod.sh" set-number --meter "$meter_id" ||
-            die 'Utility meter number was not saved.'
+        # The meter number is passed through stdin, never process argv.
+        if ! printf '%s\n' "$number" |
+            "$SCRIPT_DIR/meter-prod.sh" set-number \
+                --meter "$meter_id" --stdin; then
+            unset number
+            die 'Meter created, but its number was not saved. '
+        fi
+        unset number
         printf '%s meter registered.\n' "$label"
         if ! confirm "Register another $label meter?"; then
             break
@@ -520,11 +539,11 @@ done
 # Physical-meter association is required to complete guided onboarding.
 # The user confirms identity. Matching consumption values alone never
 # establish that two resources came from the same physical meter.
-printf '\n\nPhysical-meter setup (required)\n'
+printf '\n\nComplete utility data import (required)\n'
 printf '%s\n' '--------------------------------'
 printf 'Use the meter numbers shown on utility records.\n'
 printf 'Utility: %s — %s\n' "$utility" "$source_name"
-printf 'Imported XML file data must be assigned to the\n'
+printf 'Imported readings must be matched to the\n'
 printf 'correct physical meter before usage is ready for display.\n'
 printf 'This step requires customer confirmation of meter identity.\n'
 printf '\n'
@@ -555,9 +574,9 @@ setup_kind() {
     [[ "$count" =~ ^[0-9]+$ ]] || die 'Invalid resource count.'
     ((count > 0)) || return 0
 
-    printf '\n%s file data association\n' "$label"
+    printf '\n%s meter matching\n' "$label"
     printf '%s\n' '-----------------------------'
-    printf 'Unassociated file data entries: %s\n' "$count"
+    printf 'Unmatched imported data entries: %s\n' "$count"
     rows="$(run_readonly_sql "
         SELECT id, display_name FROM physical_meter
         WHERE data_custodian_id = $source_custodian_id
@@ -575,19 +594,19 @@ setup_kind() {
         done <<< "$rows"
     fi
     if ((meter_count == 0)); then
-        die "Register a $label meter before associating resources."
+        die "Register a $label meter before matching imported data."
     fi
     if ((meter_count > 1)); then
         printf 'More than one %s meter is registered.\n' "$label"
-        printf 'No automatic associations will be made.\n'
+        printf 'No automatic meter matches will be made.\n'
         printf 'Use meter-prod.sh to review individual file data entries.\n'
-        die 'Individual meter association is required.'
+        die 'Match imported data to each meter individually.'
     fi
-    printf 'Review the imported file data before confirming association.\n'
+    printf 'Review imported data before confirming the meter match.\n'
     printf 'An XML file may contain multiple data entries.\n'
     "$SCRIPT_DIR/meter-prod.sh" attach-compatible \
         --meter "$meter_id" ||
-        die 'Meter association failed; import is preserved.'
+        die 'Meter matching failed; imported data is preserved.'
 }
 
 summary="$(unassigned_summary)" ||
@@ -615,10 +634,10 @@ setup_kind gas 7 'Natural gas' "$gas_count"
 remaining="$(unassigned_summary)" ||
     die 'Unable to verify resource mapping.'
 if [[ -n "$remaining" ]]; then
-    printf '\nSome imported file data remains unassociated:\n%s\n' "$remaining"
-    die 'Onboarding incomplete. Resolve meter associations before usage.'
+    printf '\nSome imported data remains unmatched:\n%s\n' "$remaining"
+    die 'Import incomplete. Match meters before using totals.'
 fi
 
-printf '\n\nImport and meter association completed.\n'
-printf 'All imported file data is associated with meters.\n'
+printf '\n\nImport and meter matching completed.\n'
+printf 'All imported data is matched to physical meters.\n'
 printf 'Stream validation is still required before using totals.\n'
