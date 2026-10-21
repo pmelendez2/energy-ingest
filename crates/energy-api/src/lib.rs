@@ -134,6 +134,7 @@ struct ValidationResponse {
     status: &'static str,
     candidate_count: usize,
     selected_interval_count: usize,
+    content_fingerprint: String,
     issues: Vec<IssueResponse>,
 }
 
@@ -146,6 +147,7 @@ fn validation_response(
         status: summary.status.as_str(),
         candidate_count: summary.candidate_count,
         selected_interval_count: summary.selected_interval_count,
+        content_fingerprint: summary.content_fingerprint,
         issues: summary
             .issues
             .into_iter()
@@ -422,6 +424,7 @@ mod validation_contract_tests {
         assert_eq!(response.issues[0].kind, summary.issues[0].kind.as_str());
         let payload = serde_json::to_value(&response).unwrap();
         assert_eq!(payload["status"], "unresolved");
+        assert_eq!(payload["content_fingerprint"].as_str().unwrap().len(), 64);
         assert_eq!(payload["issues"][0]["kind"], "conflicting_duplicate");
     }
 }

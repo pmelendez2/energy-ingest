@@ -491,6 +491,8 @@ fn format_meter_validation(summary: &energy_store::MeterValidation) -> String {
     writeln!(text, "Candidates: {}", summary.candidate_count).unwrap();
     writeln!(text, "Selected intervals: {}", summary.selected_interval_count)
         .unwrap();
+    writeln!(text, "Content fingerprint: {}", summary.content_fingerprint)
+        .unwrap();
     for issue in &summary.issues {
         writeln!(
             text,
@@ -841,7 +843,8 @@ mod tests {
             &energy_store::StreamResolution::default(),
         );
         let text = super::format_meter_validation(&summary);
-        assert!(text.contains("Contract version: 1"));
+        assert!(text.contains("Contract version: 2"));
+        assert!(text.contains("Content fingerprint: "));
         assert!(text.contains("Status: no_data"));
         assert!(text.contains("Physical meter ID: 5"));
     }

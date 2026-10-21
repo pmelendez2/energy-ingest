@@ -6,6 +6,7 @@
 //! intervals are reconciled. Raw values and revision IDs are preserved.
 
 use crate::StoreError;
+use sha2::{Digest, Sha256};
 use sqlx::{FromRow, MySql, Pool, types::chrono::NaiveDateTime};
 
 /// A source interval with its currently accepted revision and measurement type.
@@ -72,7 +73,7 @@ pub struct StreamResolution {
 }
 
 /// Stable schema revision for the canonical meter-validation summary.
-pub const VALIDATION_CONTRACT_VERSION: u32 = 1;
+pub const VALIDATION_CONTRACT_VERSION: u32 = 2;
 
 /// Validation state shared by CLI and API consumers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,6 +121,7 @@ pub struct MeterValidation {
     pub status: ValidationStatus,
     pub candidate_count: usize,
     pub selected_interval_count: usize,
+    pub content_fingerprint: String,
     pub issues: Vec<StreamIssue>,
 }
 
@@ -141,8 +143,56 @@ pub fn summarize_meter_validation(
         status,
         candidate_count: result.candidate_count,
         selected_interval_count: result.intervals.len(),
+        content_fingerprint: validation_fingerprint(physical_meter_id, result),
         issues: result.issues.clone(),
     }
+}
+
+/// Content identity for one meter-resolution result, not a database cursor.
+///
+/// Changes to accepted values, revision provenance, selected intervals, or
+/// validation issues change the digest. It must be read again to detect
+/// changes; concurrent database writes are not snapshot-isolated here.
+pub fn validation_fingerprint(
+    physical_meter_id: u64,
+    result: &StreamResolution,
+) -> String {
+    let mut hash = Sha256::new();
+    hash.update(b"energy-ingest-meter-validation-v2\0");
+    hash.update(physical_meter_id.to_be_bytes());
+    hash.update((result.candidate_count as u64).to_be_bytes());
+    let mut intervals = result.intervals.clone();
+    intervals
+        .sort_by_key(|i| (i.start, i.duration_seconds, i.meter_reading_id));
+    hash.update((intervals.len() as u64).to_be_bytes());
+    for interval in intervals {
+        hash.update(interval.start.and_utc().timestamp().to_be_bytes());
+        hash.update(interval.duration_seconds.to_be_bytes());
+        hash.update(interval.raw_value.to_be_bytes());
+        hash.update(interval.meter_reading_id.to_be_bytes());
+        hash.update(interval.accepted_revision_id.to_be_bytes());
+        hash.update(interval.power_of_ten_multiplier.to_be_bytes());
+        hash.update(interval.unit_of_measure.to_be_bytes());
+    }
+    let mut issues = result.issues.clone();
+    issues.sort_by_key(|i| {
+        (i.kind.as_str(), i.interval_reading_id, i.other_interval_reading_id)
+    });
+    hash.update((issues.len() as u64).to_be_bytes());
+    for issue in issues {
+        let kind = issue.kind.as_str().as_bytes();
+        hash.update((kind.len() as u64).to_be_bytes());
+        hash.update(kind);
+        hash.update(issue.interval_reading_id.to_be_bytes());
+        match issue.other_interval_reading_id {
+            Some(id) => {
+                hash.update([1]);
+                hash.update(id.to_be_bytes());
+            }
+            None => hash.update([0]),
+        }
+    }
+    format!("{:x}", hash.finalize())
 }
 
 /// Loads accepted observations for explicitly attached resources.
@@ -427,7 +477,7 @@ mod validation_contract_tests {
     fn empty_stream_is_not_validated() {
         let summary =
             summarize_meter_validation(2, &StreamResolution::default());
-        assert_eq!(summary.contract_version, 1);
+        assert_eq!(summary.contract_version, 2);
         assert_eq!(summary.physical_meter_id, 2);
         assert_eq!(summary.status.as_str(), "no_data");
         assert_eq!(summary.selected_interval_count, 0);
@@ -492,5 +542,34 @@ mod validation_contract_tests {
             assert!(names.insert(kind.as_str()));
             assert!(!kind.as_str().is_empty());
         }
+    }
+
+    #[test]
+    fn validation_fingerprint_is_stable_for_same_resolution() {
+        let resolution = StreamResolution::default();
+        let first = summarize_meter_validation(1, &resolution);
+        let second = summarize_meter_validation(1, &resolution);
+        assert_eq!(first.content_fingerprint, second.content_fingerprint);
+        assert_eq!(first.content_fingerprint.len(), 64);
+        assert_ne!(
+            first.content_fingerprint,
+            summarize_meter_validation(2, &resolution).content_fingerprint
+        );
+    }
+
+    #[test]
+    fn validation_fingerprint_changes_when_issues_change() {
+        let mut resolution = StreamResolution {
+            candidate_count: 2,
+            intervals: Vec::new(),
+            issues: vec![StreamIssue {
+                kind: StreamIssueKind::ConflictingDuplicate,
+                interval_reading_id: 42,
+                other_interval_reading_id: Some(41),
+            }],
+        };
+        let original = validation_fingerprint(1, &resolution);
+        resolution.issues[0].interval_reading_id = 43;
+        assert_ne!(original, validation_fingerprint(1, &resolution));
     }
 }
