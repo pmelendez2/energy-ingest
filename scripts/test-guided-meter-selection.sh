@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# Regression tests for current guided commodity association behavior.
+# Regression tests for guided commodity matching.
 set -euo pipefail
 
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -61,7 +61,9 @@ setup_kind electric 1 Electricity 0 > "$tmp/output"
 setup_kind electric 1 Electricity 6 > "$tmp/output"
 grep -qx 'attach-compatible --meter 11' "$tmp/attached"
 [[ "$(wc -l < "$tmp/attached")" -eq 1 ]]
-grep -q 'Review the imported file data' "$tmp/output"
+grep -q \
+    'Review imported data before confirming the meter match.' \
+    "$tmp/output"
 
 # Natural gas uses the same one-delegation behavior.
 : > "$tmp/attached"
@@ -78,7 +80,9 @@ if (setup_kind electric 1 Electricity 2) > "$tmp/output" 2>&1; then
     exit 1
 fi
 [[ ! -s "$tmp/attached" ]]
-grep -q 'No automatic associations' "$tmp/output"
+grep -q \
+    'No automatic meter matches will be made.' \
+    "$tmp/output"
 
 # No registered meter: fail closed.
 meter_rows=''

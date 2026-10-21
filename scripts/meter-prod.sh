@@ -57,33 +57,53 @@ case "$verb" in
             args=(meter create-auto "$code" "$name")
         fi ;;
     set-number)
-        [[ $# -eq 2 && "$1" == '--meter' ]] || {
+        meter_id=''
+        stdin_mode=0
+        [[ $# -ge 2 && "$1" == '--meter' ]] || {
             usage >&2; exit 2
         }
-        [[ "$2" =~ ^[1-9][0-9]*$ ]] || exit 2
+        meter_id="$2"
+        shift 2
+        if [[ $# -eq 1 && "$1" == '--stdin' ]]; then
+            stdin_mode=1
+        elif [[ $# -ne 0 ]]; then
+            usage >&2; exit 2
+        fi
+        [[ "$meter_id" =~ ^[1-9][0-9]*$ ]] || exit 2
         [[ -f .env.prod ]] || {
             echo 'Error: run setup-prod.sh first.' >&2
             exit 2
         }
-        [[ -t 0 ]] || {
-            echo 'Error: interactive terminal required.' >&2
-            exit 2
-        }
-        read -r -p 'Utility meter number: ' number
-        [[ -n "$number" && ${#number} -le 255 ]] || {
+        if [[ "$stdin_mode" -eq 1 ]]; then
+            IFS= read -r number || {
+                echo 'Error: missing meter number on stdin.' >&2
+                exit 2
+            }
+        else
+            [[ -t 0 ]] || {
+                echo 'Error: interactive terminal required.' >&2
+                exit 2
+            }
+            read -r -p 'Utility meter number: ' number
+        fi
+        [[ -n "${number//[[:space:]]/}" &&
+            ${#number} -le 255 ]] || {
             echo 'Error: invalid meter number.' >&2
             exit 2
         }
-        printf 'Entered meter number: %s\n' "$number"
-        read -r -p 'Save this meter number? [y/N]: ' answer
-        case "$answer" in
-            y|Y|yes|YES) ;;
-            *) unset number; echo 'Meter number not saved.'; exit 0 ;;
-        esac
+        if [[ "$stdin_mode" -eq 0 ]]; then
+            printf 'Entered meter number: %s\n' "$number"
+            read -r -p 'Save this meter number? [y/N]: ' answer
+            case "$answer" in
+                y|Y|yes|YES) ;;
+                *) unset number; echo 'Meter number not saved.'; exit 0 ;;
+            esac
+        fi
         # Pipe the number to stdin; never put it on the command line.
         printf '%s\n' "$number" | docker compose -p energy-ingest \
             --env-file .env.prod -f compose.prod.yml \
-            run -T --rm --no-deps admin meter set-number "$2" --stdin
+            run -T --rm --no-deps admin meter set-number \
+                "$meter_id" --stdin
         unset number
         exit 0 ;;
     rename)
