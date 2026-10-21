@@ -23,6 +23,7 @@ mod bootstrap;
 mod error;
 mod gb;
 mod gb_import;
+mod history_sync;
 mod ingestion_source;
 mod interval_reading;
 mod oauth_authorization;
@@ -48,6 +49,10 @@ pub use gb::{
     get_usage_point_by_external_id,
 };
 pub use gb_import::{GbImportError, GbImportReport, import_gb_document_atomic};
+pub use history_sync::{
+    HistoryAction, HistoryPlanError, HistoryWindow, HistoryWindowAction,
+    plan_history_refresh,
+};
 pub use ingestion_source::{
     AcquisitionSource, AcquisitionSourceId, DataCustodian, DataCustodianId,
     IngestionRun, IngestionRunId, create_acquisition_source,
