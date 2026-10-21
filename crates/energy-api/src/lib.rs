@@ -12,7 +12,8 @@ use axum::{
 use chrono::NaiveDateTime;
 use energy_store::{
     MAX_WINDOW_CANDIDATES, StoreError, authenticate_api_token,
-    resolve_meter_window, resolve_physical_meter_stream, window_fingerprint,
+    resolve_meter_window, resolve_physical_meter_stream,
+    summarize_meter_validation, window_fingerprint,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{MySql, Pool};
@@ -126,17 +127,62 @@ struct StreamResponse {
     window_fingerprint: Option<String>,
 }
 
-fn issue_name(kind: energy_store::StreamIssueKind) -> &'static str {
-    use energy_store::StreamIssueKind as K;
-    match kind {
-        K::MissingAcceptedRevision => "missing_accepted_revision",
-        K::IncompleteMeasurementType => "incomplete_measurement_type",
-        K::UnsupportedElectricityFlow => "unsupported_electricity_flow",
-        K::IncompatibleMeasurementType => "incompatible_measurement_type",
-        K::ConflictingDuplicate => "conflicting_duplicate",
-        K::OverlappingIntervals => "overlapping_intervals",
-        K::InvalidDuration => "invalid_duration",
+#[derive(Serialize, ToSchema)]
+struct ValidationResponse {
+    contract_version: u32,
+    physical_meter_id: u64,
+    status: &'static str,
+    candidate_count: usize,
+    selected_interval_count: usize,
+    issues: Vec<IssueResponse>,
+}
+
+fn validation_response(
+    summary: energy_store::MeterValidation,
+) -> ValidationResponse {
+    ValidationResponse {
+        contract_version: summary.contract_version,
+        physical_meter_id: summary.physical_meter_id,
+        status: summary.status.as_str(),
+        candidate_count: summary.candidate_count,
+        selected_interval_count: summary.selected_interval_count,
+        issues: summary
+            .issues
+            .into_iter()
+            .map(|item| IssueResponse {
+                kind: item.kind.as_str(),
+                interval_reading_id: item.interval_reading_id,
+                other_interval_reading_id: item.other_interval_reading_id,
+            })
+            .collect(),
     }
+}
+
+/// Canonical read-only validation facts, without usage totals.
+#[utoipa::path(
+    get,
+    path = "/v1/meters/{id}/validation",
+    params(("id" = u64, Path, description = "Physical meter ID")),
+    responses(
+        (status = 200, description = "Canonical validation summary",
+         body = ValidationResponse),
+        (status = 401, description = "Bearer token required",
+         body = ErrorBody),
+        (status = 404, description = "Meter not found", body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn validation(
+    State(state): State<AppState>,
+    Path(id): Path<u64>,
+    headers: HeaderMap,
+) -> Result<Json<ValidationResponse>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    let resolution = resolve_physical_meter_stream(&state.pool, id)
+        .await
+        .map_err(store_failure)?;
+    let summary = summarize_meter_validation(id, &resolution);
+    Ok(Json(validation_response(summary)))
 }
 
 #[utoipa::path(
@@ -181,7 +227,7 @@ async fn stream(
         .issues
         .into_iter()
         .map(|item| IssueResponse {
-            kind: issue_name(item.kind),
+            kind: item.kind.as_str(),
             interval_reading_id: item.interval_reading_id,
             other_interval_reading_id: item.other_interval_reading_id,
         })
@@ -295,9 +341,10 @@ async fn healthz() -> StatusCode {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(healthz, meters, stream, window),
+    paths(healthz, meters, stream, window, validation),
     components(schemas(
-        ErrorBody, Meter, IntervalResponse, IssueResponse, StreamResponse
+        ErrorBody, Meter, IntervalResponse, IssueResponse, StreamResponse,
+        ValidationResponse
     )),
     modifiers(&BearerSecurity),
     info(
@@ -336,6 +383,7 @@ pub fn router(pool: Pool<MySql>) -> Router {
         .route("/healthz", get(healthz))
         .route("/v1/meters", get(meters))
         .route("/v1/meters/{id}/stream", get(stream))
+        .route("/v1/meters/{id}/validation", get(validation))
         .route("/v1/meters/{id}/window", get(window))
         .with_state(AppState { pool })
 }
@@ -346,4 +394,34 @@ pub fn developer_router(pool: Pool<MySql>) -> Router {
     router(pool).merge(
         SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi()),
     )
+}
+
+#[cfg(test)]
+mod validation_contract_tests {
+    use super::*;
+    use energy_store::{StreamIssue, StreamIssueKind, StreamResolution};
+
+    #[test]
+    fn http_projection_preserves_canonical_state() {
+        let resolution = StreamResolution {
+            candidate_count: 2,
+            intervals: Vec::new(),
+            issues: vec![StreamIssue {
+                kind: StreamIssueKind::ConflictingDuplicate,
+                interval_reading_id: 7,
+                other_interval_reading_id: Some(6),
+            }],
+        };
+        let summary = summarize_meter_validation(3, &resolution);
+        let response = validation_response(summary.clone());
+        assert_eq!(response.status, summary.status.as_str());
+        assert_eq!(response.contract_version, summary.contract_version);
+        assert_eq!(response.physical_meter_id, summary.physical_meter_id);
+        assert_eq!(response.candidate_count, summary.candidate_count);
+        assert_eq!(response.selected_interval_count, 0);
+        assert_eq!(response.issues[0].kind, summary.issues[0].kind.as_str());
+        let payload = serde_json::to_value(&response).unwrap();
+        assert_eq!(payload["status"], "unresolved");
+        assert_eq!(payload["issues"][0]["kind"], "conflicting_duplicate");
+    }
 }

@@ -79,9 +79,11 @@ mod window_fingerprint;
 pub use window_fingerprint::window_fingerprint;
 
 pub use usage_stream::{
-    MAX_WINDOW_CANDIDATES, SelectedInterval, StreamCandidate, StreamIssue,
-    StreamIssueKind, StreamResolution, resolve_candidates,
+    MAX_WINDOW_CANDIDATES, MeterValidation, SelectedInterval, StreamCandidate,
+    StreamIssue, StreamIssueKind, StreamResolution,
+    VALIDATION_CONTRACT_VERSION, ValidationStatus, resolve_candidates,
     resolve_meter_window, resolve_physical_meter_stream,
+    summarize_meter_validation,
 };
 
 use sqlx::{MySql, Pool};
