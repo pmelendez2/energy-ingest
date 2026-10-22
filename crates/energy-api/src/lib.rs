@@ -7,12 +7,12 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode, header},
-    routing::get,
+    routing::{get, post},
 };
 use chrono::NaiveDateTime;
 use energy_store::{
-    MAX_WINDOW_CANDIDATES, StoreError, authenticate_api_token,
-    resolve_meter_window, resolve_physical_meter_stream,
+    HistoryWindow, MAX_WINDOW_CANDIDATES, StoreError, authenticate_api_token,
+    plan_history_refresh, resolve_meter_window, resolve_physical_meter_stream,
     summarize_meter_validation, window_fingerprint,
 };
 use serde::{Deserialize, Serialize};
@@ -25,7 +25,7 @@ pub struct AppState {
     pub pool: Pool<MySql>,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Debug, Serialize, ToSchema)]
 struct ErrorBody {
     error: &'static str,
 }
@@ -129,7 +129,6 @@ struct StreamResponse {
 
 #[derive(Serialize, ToSchema)]
 struct ValidationResponse {
-    contract_version: u32,
     physical_meter_id: u64,
     status: &'static str,
     candidate_count: usize,
@@ -142,7 +141,6 @@ fn validation_response(
     summary: energy_store::MeterValidation,
 ) -> ValidationResponse {
     ValidationResponse {
-        contract_version: summary.contract_version,
         physical_meter_id: summary.physical_meter_id,
         status: summary.status.as_str(),
         candidate_count: summary.candidate_count,
@@ -332,6 +330,165 @@ async fn window(
     }))
 }
 
+/// Maximum number of date ranges in one history planning request.
+const MAX_HISTORY_RANGES: usize = 12;
+
+/// Internal UTC date range. Customers select calendar dates in the UI.
+#[derive(Deserialize, ToSchema)]
+struct HistoryRangeInput {
+    start: String,
+    end: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+struct HistoryPreviousInput {
+    start: String,
+    end: String,
+    fingerprint: Option<String>,
+}
+
+#[derive(Deserialize, ToSchema)]
+struct HistoryPlanRequest {
+    ranges: Vec<HistoryRangeInput>,
+    /// Omit for first synchronization; otherwise include every same range.
+    previous: Option<Vec<HistoryPreviousInput>>,
+}
+
+#[derive(Serialize, ToSchema)]
+struct HistoryActionResponse {
+    start: String,
+    end: String,
+    action: &'static str,
+    /// Absent for unresolved periods or periods without observations.
+    current_fingerprint: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+struct HistoryPlanResponse {
+    physical_meter_id: u64,
+    ranges: Vec<HistoryActionResponse>,
+}
+
+fn parse_history_range(
+    start: &str,
+    end: &str,
+) -> Result<(NaiveDateTime, NaiveDateTime), ApiError> {
+    parse_window(&WindowQuery { start: start.to_owned(), end: end.to_owned() })
+}
+
+/// Check the partition before performing any database work.
+/// Previously saved fingerprints are hints, never validation evidence.
+fn history_inputs(
+    request: &HistoryPlanRequest,
+) -> Result<(Vec<HistoryWindow>, Option<Vec<HistoryWindow>>), ApiError> {
+    if request.ranges.is_empty() || request.ranges.len() > MAX_HISTORY_RANGES {
+        return Err(failure(StatusCode::BAD_REQUEST, "invalid_ranges"));
+    }
+    let mut current = Vec::with_capacity(request.ranges.len());
+    for range in &request.ranges {
+        let (start, end) = parse_history_range(&range.start, &range.end)?;
+        current.push(HistoryWindow { start, end, fingerprint: None });
+    }
+    let previous = request
+        .previous
+        .as_ref()
+        .map(|entries| {
+            entries
+                .iter()
+                .map(|entry| {
+                    let (start, end) =
+                        parse_history_range(&entry.start, &entry.end)?;
+                    Ok(HistoryWindow {
+                        start,
+                        end,
+                        fingerprint: entry.fingerprint.clone(),
+                    })
+                })
+                .collect::<Result<Vec<_>, ApiError>>()
+        })
+        .transpose()?;
+    plan_history_refresh(previous.as_deref(), &current)
+        .map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_ranges"))?;
+    Ok((current, previous))
+}
+
+fn history_plan_response(
+    meter_id: u64,
+    previous: Option<&[HistoryWindow]>,
+    current: &[HistoryWindow],
+) -> Result<HistoryPlanResponse, ApiError> {
+    let actions = plan_history_refresh(previous, current)
+        .map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_ranges"))?;
+    let ranges = actions
+        .into_iter()
+        .map(|item| {
+            let fingerprint = current
+                .iter()
+                .find(|range| {
+                    range.start == item.start && range.end == item.end
+                })
+                .and_then(|range| range.fingerprint.clone());
+            HistoryActionResponse {
+                start: item.start.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                end: item.end.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                action: item.action.as_str(),
+                current_fingerprint: fingerprint,
+            }
+        })
+        .collect();
+    Ok(HistoryPlanResponse { physical_meter_id: meter_id, ranges })
+}
+
+/// Read-only, conservative historical date-range reconciliation.
+/// No records are changed, and an unresolved range is never published.
+#[utoipa::path(
+    post,
+    path = "/v1/meters/{id}/history/plan",
+    params(("id" = u64, Path, description = "Physical meter ID")),
+    request_body = HistoryPlanRequest,
+    responses(
+        (status = 200, description = "Actions for each date range",
+         body = HistoryPlanResponse),
+        (status = 400, description = "Invalid date ranges", body = ErrorBody),
+        (status = 401, description = "Bearer token required", body = ErrorBody),
+        (status = 404, description = "Meter not found", body = ErrorBody),
+        (status = 413, description = "Reduce range size", body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn history_plan(
+    State(state): State<AppState>,
+    Path(id): Path<u64>,
+    headers: HeaderMap,
+    Json(request): Json<HistoryPlanRequest>,
+) -> Result<Json<HistoryPlanResponse>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    let (mut current, previous) = history_inputs(&request)?;
+    for range in &mut current {
+        let selected =
+            resolve_meter_window(&state.pool, id, range.start, range.end)
+                .await
+                .map_err(store_failure)?
+                .ok_or_else(|| failure(StatusCode::NOT_FOUND, "not_found"))?;
+        if selected.candidate_count > MAX_WINDOW_CANDIDATES as usize {
+            return Err(failure(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "window_too_large",
+            ));
+        }
+        // An empty or conflicting range is blocked, not zero usage.
+        if selected.candidate_count > 0 && selected.issues.is_empty() {
+            range.fingerprint = Some(window_fingerprint(
+                id,
+                range.start,
+                range.end,
+                &selected.intervals,
+            ));
+        }
+    }
+    Ok(Json(history_plan_response(id, previous.as_deref(), &current)?))
+}
+
 #[utoipa::path(
     get,
     path = "/healthz",
@@ -343,10 +500,11 @@ async fn healthz() -> StatusCode {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(healthz, meters, stream, window, validation),
+    paths(healthz, meters, stream, window, validation, history_plan),
     components(schemas(
         ErrorBody, Meter, IntervalResponse, IssueResponse, StreamResponse,
-        ValidationResponse
+        ValidationResponse, HistoryRangeInput, HistoryPreviousInput,
+        HistoryPlanRequest, HistoryActionResponse, HistoryPlanResponse
     )),
     modifiers(&BearerSecurity),
     info(
@@ -387,6 +545,7 @@ pub fn router(pool: Pool<MySql>) -> Router {
         .route("/v1/meters/{id}/stream", get(stream))
         .route("/v1/meters/{id}/validation", get(validation))
         .route("/v1/meters/{id}/window", get(window))
+        .route("/v1/meters/{id}/history/plan", post(history_plan))
         .with_state(AppState { pool })
 }
 
@@ -417,14 +576,115 @@ mod validation_contract_tests {
         let summary = summarize_meter_validation(3, &resolution);
         let response = validation_response(summary.clone());
         assert_eq!(response.status, summary.status.as_str());
-        assert_eq!(response.contract_version, summary.contract_version);
         assert_eq!(response.physical_meter_id, summary.physical_meter_id);
         assert_eq!(response.candidate_count, summary.candidate_count);
         assert_eq!(response.selected_interval_count, 0);
         assert_eq!(response.issues[0].kind, summary.issues[0].kind.as_str());
         let payload = serde_json::to_value(&response).unwrap();
+        assert!(payload.get("contract_version").is_none());
         assert_eq!(payload["status"], "unresolved");
         assert_eq!(payload["content_fingerprint"].as_str().unwrap().len(), 64);
         assert_eq!(payload["issues"][0]["kind"], "conflicting_duplicate");
+    }
+
+    fn date_range(start: &str, end: &str) -> HistoryRangeInput {
+        HistoryRangeInput { start: start.to_owned(), end: end.to_owned() }
+    }
+
+    #[test]
+    fn first_sync_uses_only_server_fingerprints() {
+        let input = HistoryPlanRequest {
+            ranges: vec![date_range(
+                "2026-10-01T00:00:00Z",
+                "2026-10-02T00:00:00Z",
+            )],
+            previous: None,
+        };
+        let (mut current, old) = history_inputs(&input).unwrap();
+        current[0].fingerprint = Some("server-value".to_owned());
+        let report =
+            history_plan_response(5, old.as_deref(), &current).unwrap();
+        let payload = serde_json::to_value(&report).unwrap();
+        assert!(payload.get("contract_version").is_none());
+        assert_eq!(report.physical_meter_id, 5);
+        assert_eq!(report.ranges[0].action, "refresh");
+        assert_eq!(
+            report.ranges[0].current_fingerprint.as_deref(),
+            Some("server-value"),
+        );
+    }
+
+    #[test]
+    fn unchanged_and_corrected_ranges_are_distinguished() {
+        let input = HistoryPlanRequest {
+            ranges: vec![
+                date_range("2026-10-01T00:00:00Z", "2026-10-02T00:00:00Z"),
+                date_range("2026-10-02T00:00:00Z", "2026-10-03T00:00:00Z"),
+            ],
+            previous: Some(vec![
+                HistoryPreviousInput {
+                    start: "2026-10-01T00:00:00Z".to_owned(),
+                    end: "2026-10-02T00:00:00Z".to_owned(),
+                    fingerprint: Some("same".to_owned()),
+                },
+                HistoryPreviousInput {
+                    start: "2026-10-02T00:00:00Z".to_owned(),
+                    end: "2026-10-03T00:00:00Z".to_owned(),
+                    fingerprint: Some("before".to_owned()),
+                },
+            ]),
+        };
+        let (mut current, old) = history_inputs(&input).unwrap();
+        current[0].fingerprint = Some("same".to_owned());
+        current[1].fingerprint = Some("after".to_owned());
+        let report =
+            history_plan_response(1, old.as_deref(), &current).unwrap();
+        assert_eq!(report.ranges[0].action, "unchanged");
+        assert_eq!(report.ranges[1].action, "refresh");
+    }
+
+    #[test]
+    fn unresolved_and_empty_ranges_are_blocked() {
+        let input = HistoryPlanRequest {
+            ranges: vec![date_range(
+                "2026-10-01T00:00:00Z",
+                "2026-10-02T00:00:00Z",
+            )],
+            previous: None,
+        };
+        let (current, previous) = history_inputs(&input).unwrap();
+        let report =
+            history_plan_response(1, previous.as_deref(), &current).unwrap();
+        assert_eq!(report.ranges[0].action, "blocked");
+        assert!(report.ranges[0].current_fingerprint.is_none());
+    }
+
+    #[test]
+    fn invalid_partitions_fail_before_database_queries() {
+        let input = HistoryPlanRequest {
+            ranges: vec![
+                date_range("2026-10-01T00:00:00Z", "2026-10-03T00:00:00Z"),
+                date_range("2026-10-02T00:00:00Z", "2026-10-04T00:00:00Z"),
+            ],
+            previous: None,
+        };
+        assert!(history_inputs(&input).is_err());
+    }
+
+    #[test]
+    fn changed_partitions_and_excessive_ranges_are_rejected() {
+        let one = date_range("2026-10-01T00:00:00Z", "2026-10-02T00:00:00Z");
+        let mismatch =
+            HistoryPlanRequest { ranges: vec![one], previous: Some(vec![]) };
+        assert!(history_inputs(&mismatch).is_err());
+        let excessive = HistoryPlanRequest {
+            ranges: (0..=MAX_HISTORY_RANGES)
+                .map(|_| {
+                    date_range("2026-10-01T00:00:00Z", "2026-10-02T00:00:00Z")
+                })
+                .collect(),
+            previous: None,
+        };
+        assert!(history_inputs(&excessive).is_err());
     }
 }

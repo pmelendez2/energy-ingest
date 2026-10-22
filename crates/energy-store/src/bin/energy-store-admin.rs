@@ -485,7 +485,6 @@ async fn execute(args: &[String]) -> Result<(), String> {
 fn format_meter_validation(summary: &energy_store::MeterValidation) -> String {
     use std::fmt::Write;
     let mut text = String::new();
-    writeln!(text, "Contract version: {}", summary.contract_version).unwrap();
     writeln!(text, "Physical meter ID: {}", summary.physical_meter_id).unwrap();
     writeln!(text, "Status: {}", summary.status.as_str()).unwrap();
     writeln!(text, "Candidates: {}", summary.candidate_count).unwrap();
@@ -843,7 +842,6 @@ mod tests {
             &energy_store::StreamResolution::default(),
         );
         let text = super::format_meter_validation(&summary);
-        assert!(text.contains("Contract version: 2"));
         assert!(text.contains("Content fingerprint: "));
         assert!(text.contains("Status: no_data"));
         assert!(text.contains("Physical meter ID: 5"));
