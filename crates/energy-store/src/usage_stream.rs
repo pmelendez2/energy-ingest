@@ -6,6 +6,8 @@
 //! intervals are reconciled. Raw values and revision IDs are preserved.
 
 use crate::StoreError;
+use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, MySql, Pool, types::chrono::NaiveDateTime};
 
@@ -236,7 +238,10 @@ pub async fn resolve_physical_meter_stream(
     .fetch_all(pool)
     .await?;
 
-    Ok(resolve_candidates(candidates))
+    Ok(resolve_candidates_with_gas_zone(
+        candidates,
+        configured_gas_zone(physical_meter_id),
+    ))
 }
 
 /// Upper bound on candidates evaluated for one historical window.
@@ -303,7 +308,10 @@ pub async fn resolve_meter_window(
             ..StreamResolution::default()
         }));
     }
-    Ok(Some(resolve_candidates(candidates)))
+    Ok(Some(resolve_candidates_with_gas_zone(
+        candidates,
+        configured_gas_zone(physical_meter_id),
+    )))
 }
 
 /// Selects exact duplicates once; refuses ambiguous or overlapping data.
@@ -312,7 +320,16 @@ pub async fn resolve_meter_window(
 /// choose quality winners, or sum values across resource boundaries.
 /// A future policy must explicitly authorize those operations.
 pub fn resolve_candidates(
+    candidates: Vec<StreamCandidate>,
+) -> StreamResolution {
+    resolve_candidates_with_gas_zone(candidates, None)
+}
+
+/// Resolve candidates with a verified daily gas time zone.
+/// Other readings retain strict UTC overlap validation.
+pub fn resolve_candidates_with_gas_zone(
     mut candidates: Vec<StreamCandidate>,
+    gas_zone: Option<Tz>,
 ) -> StreamResolution {
     candidates.sort_by_key(|c| {
         (c.interval_start, c.interval_duration_seconds, c.interval_reading_id)
@@ -404,29 +421,46 @@ pub fn resolve_candidates(
         } else {
             signature = Some(metadata);
         }
-        // An interval is a half-open range [start, end).
-        if let Some((previous, previous_end)) = selected.last()
-            && candidate.interval_start < *previous_end
-        {
+        // Daily gas timestamps use a reporting date, not a fixed UTC
+        // cadence. Spring DST can make consecutive dates 23 hours apart.
+        let day = gas_zone.and_then(|tz| gas_reporting_day(candidate, tz));
+        if let Some((previous, previous_end)) = selected.last() {
+            let previous_day =
+                gas_zone.and_then(|tz| gas_reporting_day(previous, tz));
+            let same_day = day.is_some() && day == previous_day;
+            let next_day = day
+                .zip(previous_day)
+                .is_some_and(|(a, b)| b.succ_opt() == Some(a));
             let exact = candidate.interval_start == previous.interval_start
                 && end == *previous_end;
-            if exact
-                && candidate.reading_value == previous.reading_value
-                && candidate.reading_quality == previous.reading_quality
-            {
+            if same_day || exact {
+                if candidate.reading_value == previous.reading_value
+                    && candidate.reading_quality == previous.reading_quality
+                {
+                    continue;
+                }
+                issue(
+                    &mut result,
+                    StreamIssueKind::ConflictingDuplicate,
+                    candidate.interval_reading_id,
+                    Some(previous.interval_reading_id),
+                );
                 continue;
             }
-            issue(
-                &mut result,
-                if exact {
-                    StreamIssueKind::ConflictingDuplicate
-                } else {
-                    StreamIssueKind::OverlappingIntervals
-                },
-                candidate.interval_reading_id,
-                Some(previous.interval_reading_id),
-            );
-            continue;
+            if candidate.interval_start < *previous_end {
+                let allowed_dst_overlap = next_day
+                    && *previous_end - candidate.interval_start
+                        == chrono::Duration::hours(1);
+                if !allowed_dst_overlap {
+                    issue(
+                        &mut result,
+                        StreamIssueKind::OverlappingIntervals,
+                        candidate.interval_reading_id,
+                        Some(previous.interval_reading_id),
+                    );
+                    continue;
+                }
+            }
         }
         selected.push((candidate, end));
     }
@@ -462,6 +496,32 @@ fn issue(
         interval_reading_id,
         other_interval_reading_id,
     });
+}
+
+/// Unknown/unconfigured zones retain the existing strict UTC behavior.
+fn configured_gas_zone(meter_id: u64) -> Option<Tz> {
+    let key = format!("ENGY_GAS_DAILY_ZONE_METER_{meter_id}");
+    std::env::var(key).ok()?.parse::<Tz>().ok()
+}
+
+fn gas_reporting_day(
+    candidate: &StreamCandidate,
+    zone: Tz,
+) -> Option<chrono::NaiveDate> {
+    if candidate.commodity != Some(7)
+        || candidate.interval_duration_seconds != 86_400
+    {
+        return None;
+    }
+    let utc = DateTime::<Utc>::from_naive_utc_and_offset(
+        candidate.interval_start,
+        Utc,
+    );
+    let local = utc.with_timezone(&zone);
+    if local.format("%H:%M:%S").to_string() != "23:59:00" {
+        return None;
+    }
+    Some(local.date_naive())
 }
 
 #[cfg(test)]

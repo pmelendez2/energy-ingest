@@ -168,3 +168,67 @@ fn forward_electricity_still_resolves() {
     assert_eq!(result.intervals.len(), 1);
     assert!(result.issues.is_empty());
 }
+
+fn gas_day(id: u64, utc: &str, value: i64) -> StreamCandidate {
+    let mut c = candidate(id, 0, 86_400, value);
+    c.interval_start =
+        NaiveDateTime::parse_from_str(utc, "%Y-%m-%d %H:%M:%S").unwrap();
+    c.commodity = Some(7);
+    c.unit_of_measure = Some(169);
+    c.flow_direction = Some(0);
+    c
+}
+
+#[test]
+fn spring_dst_gas_requires_verified_zone() {
+    use energy_store::resolve_candidates_with_gas_zone;
+    let data = vec![
+        gas_day(29390, "2026-03-08 07:59:00", 0),
+        gas_day(29391, "2026-03-09 06:59:00", 1023),
+        gas_day(29786, "2026-03-09 06:59:00", 1023),
+    ];
+    assert!(!resolve_candidates(data.clone()).issues.is_empty());
+    let zone = "America/Los_Angeles".parse().unwrap();
+    let result = resolve_candidates_with_gas_zone(data, Some(zone));
+    assert!(result.issues.is_empty());
+    assert_eq!(result.intervals.len(), 2);
+    assert_eq!(result.intervals[1].raw_value, 1023);
+}
+
+#[test]
+fn autumn_dst_gas_does_not_fabricate_usage() {
+    use energy_store::resolve_candidates_with_gas_zone;
+    let zone = "America/Los_Angeles".parse().unwrap();
+    let data = vec![
+        gas_day(1, "2026-11-01 06:59:00", 42),
+        gas_day(2, "2026-11-02 07:59:00", 43),
+    ];
+    let result = resolve_candidates_with_gas_zone(data, Some(zone));
+    assert!(result.issues.is_empty());
+    assert_eq!(result.intervals.len(), 2);
+    assert_eq!(result.intervals[0].raw_value, 42);
+    assert_eq!(result.intervals[1].raw_value, 43);
+}
+
+#[test]
+fn gas_conflicting_duplicate_is_still_rejected() {
+    use energy_store::resolve_candidates_with_gas_zone;
+    let zone = "America/Los_Angeles".parse().unwrap();
+    let data = vec![
+        gas_day(1, "2026-03-09 06:59:00", 1023),
+        gas_day(2, "2026-03-09 06:59:00", 1024),
+    ];
+    let result = resolve_candidates_with_gas_zone(data, Some(zone));
+    assert!(result.intervals.is_empty());
+    assert_eq!(result.issues[0].kind, StreamIssueKind::ConflictingDuplicate);
+}
+
+#[test]
+fn unconfigured_and_non_gas_intervals_remain_strict() {
+    use energy_store::resolve_candidates_with_gas_zone;
+    let zone = "America/Los_Angeles".parse().unwrap();
+    let data = vec![candidate(1, 0, 86_400, 50), candidate(2, 1, 3_600, 10)];
+    let result = resolve_candidates_with_gas_zone(data, Some(zone));
+    assert!(result.intervals.is_empty());
+    assert_eq!(result.issues[0].kind, StreamIssueKind::OverlappingIntervals);
+}
