@@ -72,9 +72,6 @@ pub struct StreamResolution {
     pub issues: Vec<StreamIssue>,
 }
 
-/// Stable schema revision for the canonical meter-validation summary.
-pub const VALIDATION_CONTRACT_VERSION: u32 = 2;
-
 /// Validation state shared by CLI and API consumers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidationStatus {
@@ -116,7 +113,6 @@ impl StreamIssueKind {
 /// is not a global change cursor or a snapshot-consistent revision token.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MeterValidation {
-    pub contract_version: u32,
     pub physical_meter_id: u64,
     pub status: ValidationStatus,
     pub candidate_count: usize,
@@ -138,7 +134,6 @@ pub fn summarize_meter_validation(
         ValidationStatus::Validated
     };
     MeterValidation {
-        contract_version: VALIDATION_CONTRACT_VERSION,
         physical_meter_id,
         status,
         candidate_count: result.candidate_count,
@@ -477,7 +472,6 @@ mod validation_contract_tests {
     fn empty_stream_is_not_validated() {
         let summary =
             summarize_meter_validation(2, &StreamResolution::default());
-        assert_eq!(summary.contract_version, 2);
         assert_eq!(summary.physical_meter_id, 2);
         assert_eq!(summary.status.as_str(), "no_data");
         assert_eq!(summary.selected_interval_count, 0);

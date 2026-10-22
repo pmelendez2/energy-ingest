@@ -16,8 +16,9 @@ It does **not** alter how source readings are selected.
 - Rust: `summarize_meter_validation(meter_id, &resolution)`.
 - CLI: `energy-store-admin meter validate METER_ID`.
 - HTTP: `GET /v1/meters/{id}/validation` (bearer authentication required).
+  API version 1 governs both HTTP requests and responses.
 
-Both consumers expose contract version `2`, physical meter ID, status,
+Both consumers expose the physical meter ID, status,
 candidate count, selected interval count, deterministic content fingerprint,
 and stable issue codes.
 The CLI renders text; the API returns JSON. Both derive from the same
@@ -40,7 +41,6 @@ Missing intervals remain missing and are never synthesized.
 
 ```json
 {
-  "contract_version": 2,
   "physical_meter_id": 3,
   "status": "unresolved",
   "candidate_count": 2,
