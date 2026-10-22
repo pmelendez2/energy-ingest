@@ -81,8 +81,12 @@ services:
       ENGY_DB_NAME: ${ENGY_DB_NAME}
       ENGY_DB_USER: ${ENGY_DB_USER}
       ENGY_API_LISTEN: 0.0.0.0:8080
-      # Optional, per-meter verified daily gas reporting time zone.
-      ENGY_GAS_DAILY_ZONE_METER_2: ${ENGY_GAS_DAILY_ZONE_METER_2:-}
+    volumes:
+      # Reuse the host's existing local-time configuration.
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+        read_only: true
     secrets:
       - energy_db_pwd
     ports:

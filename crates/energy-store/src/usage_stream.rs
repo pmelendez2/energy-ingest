@@ -6,7 +6,7 @@
 //! intervals are reconciled. Raw values and revision IDs are preserved.
 
 use crate::StoreError;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use chrono_tz::Tz;
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, MySql, Pool, types::chrono::NaiveDateTime};
@@ -238,10 +238,7 @@ pub async fn resolve_physical_meter_stream(
     .fetch_all(pool)
     .await?;
 
-    Ok(resolve_candidates_with_gas_zone(
-        candidates,
-        configured_gas_zone(physical_meter_id),
-    ))
+    Ok(resolve_candidates_with_local_gas_zone(candidates))
 }
 
 /// Upper bound on candidates evaluated for one historical window.
@@ -308,10 +305,7 @@ pub async fn resolve_meter_window(
             ..StreamResolution::default()
         }));
     }
-    Ok(Some(resolve_candidates_with_gas_zone(
-        candidates,
-        configured_gas_zone(physical_meter_id),
-    )))
+    Ok(Some(resolve_candidates_with_local_gas_zone(candidates)))
 }
 
 /// Selects exact duplicates once; refuses ambiguous or overlapping data.
@@ -328,9 +322,29 @@ pub fn resolve_candidates(
 /// Resolve candidates with a verified daily gas time zone.
 /// Other readings retain strict UTC overlap validation.
 pub fn resolve_candidates_with_gas_zone(
-    mut candidates: Vec<StreamCandidate>,
+    candidates: Vec<StreamCandidate>,
     gas_zone: Option<Tz>,
 ) -> StreamResolution {
+    resolve_candidates_with_reporting_day(candidates, |candidate| {
+        gas_zone.and_then(|zone| gas_reporting_day(candidate, zone))
+    })
+}
+
+/// Production uses the local time zone configured by the operating system.
+/// Docker mounts the host's /etc/localtime read-only into the API service.
+fn resolve_candidates_with_local_gas_zone(
+    candidates: Vec<StreamCandidate>,
+) -> StreamResolution {
+    resolve_candidates_with_reporting_day(candidates, gas_reporting_day_local)
+}
+
+fn resolve_candidates_with_reporting_day<F>(
+    mut candidates: Vec<StreamCandidate>,
+    reporting_day: F,
+) -> StreamResolution
+where
+    F: Fn(&StreamCandidate) -> Option<chrono::NaiveDate>,
+{
     candidates.sort_by_key(|c| {
         (c.interval_start, c.interval_duration_seconds, c.interval_reading_id)
     });
@@ -423,10 +437,9 @@ pub fn resolve_candidates_with_gas_zone(
         }
         // Daily gas timestamps use a reporting date, not a fixed UTC
         // cadence. Spring DST can make consecutive dates 23 hours apart.
-        let day = gas_zone.and_then(|tz| gas_reporting_day(candidate, tz));
+        let day = reporting_day(candidate);
         if let Some((previous, previous_end)) = selected.last() {
-            let previous_day =
-                gas_zone.and_then(|tz| gas_reporting_day(previous, tz));
+            let previous_day = reporting_day(previous);
             let same_day = day.is_some() && day == previous_day;
             let next_day = day
                 .zip(previous_day)
@@ -498,10 +511,25 @@ fn issue(
     });
 }
 
-/// Unknown/unconfigured zones retain the existing strict UTC behavior.
-fn configured_gas_zone(meter_id: u64) -> Option<Tz> {
-    let key = format!("ENGY_GAS_DAILY_ZONE_METER_{meter_id}");
-    std::env::var(key).ok()?.parse::<Tz>().ok()
+/// Resolve the reporting day with the container's system local time.
+/// No additional environment variable or meter-specific setting is read.
+fn gas_reporting_day_local(
+    candidate: &StreamCandidate,
+) -> Option<chrono::NaiveDate> {
+    if candidate.commodity != Some(7)
+        || candidate.interval_duration_seconds != 86_400
+    {
+        return None;
+    }
+    let utc = DateTime::<Utc>::from_naive_utc_and_offset(
+        candidate.interval_start,
+        Utc,
+    );
+    let local = utc.with_timezone(&Local);
+    if local.format("%H:%M:%S").to_string() != "23:59:00" {
+        return None;
+    }
+    Some(local.date_naive())
 }
 
 fn gas_reporting_day(
