@@ -33,6 +33,17 @@ original Green Button numeric commodity/unit codes, and overlap pairs:
 bash analyze-prod-data.sh --details
 ```
 
+The detailed report also identifies the UTC dates and **unique interval
+counts** where two resources attached to the same physical meter contain
+different accepted values. These counts differ from the pairwise totals:
+one hour may appear in several resource pairs but is counted only once
+per physical meter and date. The report does not expose reading values.
+
+A conflict is not automatically a utility correction. The canonical
+usage stream continues to reject conflicting overlaps until an explicit
+resolution policy has been verified. Do not add overlapping resources
+together or import unresolved totals into Home Assistant.
+
 For command help:
 
 ```bash

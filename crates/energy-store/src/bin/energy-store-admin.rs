@@ -805,8 +805,65 @@ async fn analyze_streams(
             println!("{a:>4} {b:>5} {overlap:>9} {different:>11}");
         }
         println!("IDs above identify database resources, not meters.");
+
+        // Unlike the pairwise counts above, these counts represent unique
+        // conflicting intervals within an explicitly associated meter.
+        // This is diagnostic evidence only: no value is chosen as a winner.
+        let conflict_days: Vec<(u64, String, i64)> = sqlx::query_as(
+            "SELECT conflicts.physical_meter_id, conflicts.day, COUNT(*) \
+             FROM ( \
+               SELECT DISTINCT pa.physical_meter_id, \
+                 DATE_FORMAT(a.interval_start, '%Y-%m-%d') AS day, \
+                 a.interval_start, a.interval_duration_seconds \
+               FROM interval_reading a \
+               JOIN interval_reading b \
+                 ON a.meter_reading_id < b.meter_reading_id \
+                AND a.interval_start = b.interval_start \
+                AND a.interval_duration_seconds = \
+                    b.interval_duration_seconds \
+               JOIN physical_meter_resource pa \
+                 ON pa.meter_reading_id = a.meter_reading_id \
+               JOIN physical_meter_resource pb \
+                 ON pb.meter_reading_id = b.meter_reading_id \
+                AND pb.physical_meter_id = pa.physical_meter_id \
+               JOIN interval_reading_revision va \
+                 ON va.id = a.accepted_revision_id \
+               JOIN interval_reading_revision vb \
+                 ON vb.id = b.accepted_revision_id \
+               WHERE va.reading_value <> vb.reading_value \
+             ) AS conflicts \
+             GROUP BY conflicts.physical_meter_id, conflicts.day \
+             ORDER BY conflicts.physical_meter_id, conflicts.day",
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|error| {
+            format!("associated conflict-date query failed: {error}")
+        })?;
+        print!("{}", format_conflict_days(&conflict_days));
     }
     Ok(())
+}
+
+/// Render only dates and counts; raw utility readings remain private.
+fn format_conflict_days(rows: &[(u64, String, i64)]) -> String {
+    use std::fmt::Write;
+
+    let mut output = String::from(
+        "\nUnique differing intervals by associated meter and UTC date\n",
+    );
+    if rows.is_empty() {
+        output
+            .push_str("No differing values among associated resource pairs.\n");
+    } else {
+        output.push_str("Meter ID  UTC date     Unique intervals\n");
+        for (meter, day, count) in rows {
+            writeln!(output, "{meter:>8}  {day}  {count:>16}")
+                .expect("writing into String is infallible");
+        }
+    }
+    output.push_str("Differences are unresolved; no values were replaced.\n");
+    output
 }
 
 fn commodity_label(code: Option<u32>) -> String {
@@ -824,7 +881,26 @@ fn display_option<T: std::fmt::Display>(value: Option<T>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Command, parse};
+    use super::{Command, format_conflict_days, parse};
+
+    #[test]
+    fn conflict_report_counts_unique_hours_and_omits_values() {
+        let report = format_conflict_days(&[
+            (1, "2026-10-06".to_owned(), 24),
+            (2, "2026-10-26".to_owned(), 1),
+        ]);
+        assert!(report.contains("2026-10-06"));
+        assert!(report.contains("2026-10-26"));
+        assert!(report.contains("      24"));
+        assert!(report.contains("unresolved"));
+        assert!(!report.contains("reading_value"));
+    }
+
+    #[test]
+    fn no_conflicts_reported_without_candidate_pairs() {
+        let report = format_conflict_days(&[]);
+        assert!(report.contains("No differing values"));
+    }
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|v| (*v).to_owned()).collect()
