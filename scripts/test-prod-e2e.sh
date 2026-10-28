@@ -175,6 +175,23 @@ if not match or int(match.group(3)) < 1:
 print(f"PASS: {match.group(3)} observations accepted")
 PY
 
+# Capture persistent observation state, not ingestion-run audit counters.
+# An exact replay must not create revisions or move accepted pointers.
+observation_state() {
+    docker exec -i "$DB" sh -c '
+        export MYSQL_PWD="$(cat /run/secrets/energy_db_pwd)"
+        exec mariadb --batch --skip-column-names \
+            -u "$MARIADB_USER" "$MARIADB_DATABASE"
+    ' <<'SQL_STATE'
+SELECT 'readings', COUNT(*) FROM interval_reading;
+SELECT 'revisions', COUNT(*) FROM interval_reading_revision;
+SELECT 'receipts', COUNT(*) FROM import_document;
+SELECT 'accepted', id, COALESCE(accepted_revision_id, 0)
+FROM interval_reading ORDER BY id;
+SQL_STATE
+}
+observation_state >"$WORK/before-reimport-state"
+
 printf 'Reimporting identical fixture to verify idempotency ...\n'
 docker run --rm --network "$NET" \
     --mount "$app_mount" \
@@ -195,14 +212,24 @@ match = re.search(r"^TOTAL\s+(\d+)\s+(\d+)\s+(\d+)",
 if not match:
     raise SystemExit("FAIL: reimport summary is missing")
 observed, unchanged, accepted = map(int, match.groups())
-if observed == 0 or unchanged == 0 or accepted != 0:
+document_skip = (observed, unchanged, accepted) == (0, 0, 0)
+reading_skip = observed > 0 and unchanged == observed and accepted == 0
+if not (document_skip or reading_skip):
     raise SystemExit(
         "FAIL: identical reimport was not idempotent: "
         f"observed={observed}, unchanged={unchanged}, "
         f"accepted={accepted}"
     )
-print(f"PASS: {unchanged} unchanged observations on reimport")
+if document_skip:
+    print("PASS: identical document skipped without reading replay")
+else:
+    print(f"PASS: {unchanged} unchanged observations on reimport")
 PY_REIMPORT
+observation_state >"$WORK/after-reimport-state"
+cmp -s "$WORK/before-reimport-state" \
+    "$WORK/after-reimport-state" || \
+    fail 'Identical reimport changed stored readings or revisions'
+printf 'PASS: identical reimport preserved stored observation state\n'
 
 printf 'Creating disposable API token ...\n'
 # Only stdout contains the token. Never print or persist it in Git/logs.
