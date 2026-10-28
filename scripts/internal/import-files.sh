@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# Import selected utility XML files from a private host directory.
+# Internal import job. Customers use scripts/energy-import.sh.
 set -euo pipefail
 # Resolve deployment files relative to this script, not the shell cwd.
 SCRIPT_DIR="$(
     cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 )"
-cd -- "$SCRIPT_DIR/../deploy/docker-compose"
+cd -- "$SCRIPT_DIR/../../deploy/docker-compose"
 
 usage() {
     cat <<'HELP'
-Usage: ./import-prod.sh --file 'PATTERN' [OPTIONS]
-       ./import-prod.sh --file '*.xml' --list-files
+Usage: internal/import-files.sh --file 'PATTERN' [OPTIONS]
+       internal/import-files.sh --file '*.xml' --list-files
 
 Options:
   -s, --source-id ID    Override automatic source selection (positive ID).

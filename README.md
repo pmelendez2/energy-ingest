@@ -58,11 +58,13 @@ See `SECURITY.md` and the architecture decision records under `docs/adr/`.
 
 ## Project status
 
-The first production Docker image, version `0.1.0`, is published for
-`linux/amd64` and `linux/arm64`. This is an initial release, not a claim
-that all planned features or platforms have been validated.
+Production images are published for `linux/amd64` and `linux/arm64`.
+The current development release target is recorded once in
+[`release/VERSION`](release/VERSION). It is not necessarily published yet.
+For installation, select the most recent stable
+[GitHub release](https://github.com/pmelendez2/energy_ingest/releases).
 
-- Image: `docker.io/pmelendez2/gb-energy-ingest:0.1.0`.
+- Image: `docker.io/pmelendez2/gb-energy-ingest:<release-version>`.
 - [Installation](docs/INSTALLATION.md) and
   [Linux setup](docs/INSTALL_LINUX.md).
 - [Published release evidence](docs/RELEASE_0_1_0_VALIDATION.md).

@@ -17,6 +17,7 @@ const EXPECTED_TABLES: &[&str] = &[
     "data_custodian",
     "acquisition_source",
     "ingestion_run",
+    "import_document",
     "usage_point",
     "reading_type",
     "meter_reading",

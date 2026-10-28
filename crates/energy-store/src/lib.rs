@@ -48,7 +48,10 @@ pub use gb::{
     get_reading_type_by_external_id, get_usage_point,
     get_usage_point_by_external_id,
 };
-pub use gb_import::{GbImportError, GbImportReport, import_gb_document_atomic};
+pub use gb_import::{
+    GbImportError, GbImportReport, import_gb_document_atomic,
+    import_gb_document_atomic_with_hash,
+};
 pub use history_sync::{
     HistoryAction, HistoryPlanError, HistoryWindow, HistoryWindowAction,
     plan_history_refresh,

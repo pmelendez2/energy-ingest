@@ -18,11 +18,12 @@ or host MariaDB installation is required.
 
 Select the current stable version from the
 [official releases](https://github.com/pmelendez2/energy_ingest/releases).
-Set `version` to that release number. The following example targets
-**v0.1.4**:
+Set `version` to that **published** release number. The development target
+recorded in `release/VERSION` may not be published yet. Do not use it until
+the corresponding GitHub release and container image exist.
 
 ```bash
-version=0.1.4
+version=REPLACE_WITH_PUBLISHED_VERSION
 base="https://github.com/pmelendez2/energy_ingest/releases/download/energy-ingest-v${version}"
 mkdir -p "$HOME/energy-ingest-prod"
 cd "$HOME/energy-ingest-prod"

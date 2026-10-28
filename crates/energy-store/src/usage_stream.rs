@@ -21,6 +21,8 @@ pub struct StreamCandidate {
     pub interval_duration_seconds: u32,
     pub reading_value: Option<i64>,
     pub reading_quality: Option<String>,
+    pub source_published_at: Option<NaiveDateTime>,
+    pub source_updated_at: Option<NaiveDateTime>,
     pub accumulation_behaviour: Option<u32>,
     pub commodity: Option<u32>,
     pub data_qualifier: Option<u32>,
@@ -216,6 +218,7 @@ pub async fn resolve_physical_meter_stream(
                ir.accepted_revision_id,
                ir.interval_start, ir.interval_duration_seconds,
                rev.reading_value, rev.reading_quality,
+               rev.source_published_at, rev.source_updated_at,
                rt.accumulation_behaviour, rt.commodity,
                rt.data_qualifier, rt.flow_direction,
                rt.kind, rt.phase, rt.power_of_ten_multiplier,
@@ -272,6 +275,7 @@ pub async fn resolve_meter_window(
                ir.accepted_revision_id,
                ir.interval_start, ir.interval_duration_seconds,
                rev.reading_value, rev.reading_quality,
+               rev.source_published_at, rev.source_updated_at,
                rt.accumulation_behaviour, rt.commodity,
                rt.data_qualifier, rt.flow_direction,
                rt.kind, rt.phase, rt.power_of_ten_multiplier,
@@ -447,6 +451,21 @@ where
             let exact = candidate.interval_start == previous.interval_start
                 && end == *previous_end;
             if same_day || exact {
+                if exact
+                    && let (Some(older), Some(newer)) = (
+                        source_revision_time(previous),
+                        source_revision_time(candidate),
+                    )
+                    && older != newer
+                {
+                    // The source metadata must establish an actual order.
+                    // A later ingestion_run ID is not evidence of freshness.
+                    if newer > older {
+                        *selected.last_mut().expect("previous exists") =
+                            (candidate, end);
+                    }
+                    continue;
+                }
                 if candidate.reading_value == previous.reading_value
                     && candidate.reading_quality == previous.reading_quality
                 {
@@ -496,6 +515,12 @@ where
             .collect();
     }
     result
+}
+
+/// Only explicit utility revision/publication metadata proves ordering.
+/// Import time alone cannot distinguish an old export imported late.
+fn source_revision_time(candidate: &StreamCandidate) -> Option<NaiveDateTime> {
+    candidate.source_updated_at.or(candidate.source_published_at)
 }
 
 fn issue(

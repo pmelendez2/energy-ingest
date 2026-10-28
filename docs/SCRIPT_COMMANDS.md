@@ -38,9 +38,9 @@ customer's original downloads. Names are presented for source selection;
 numeric IDs are internal and not required in the default onboarding flow.
 Meter numbers are entered privately and sent to the Rust backend on stdin.
 
-The lower-level `register-prod.sh`, `import-prod.sh` and `meter-prod.sh`
-commands remain available for advanced administration. See their `--help`
-output and [Installation](INSTALLATION.md) for the standard workflow.
+`energy-import.sh` is the only supported customer XML import command.
+Its internal import job is not a separate user-facing workflow.
+`register-prod.sh` and `meter-prod.sh` remain administrative helpers.
 
 ## Analyze and manage meters
 

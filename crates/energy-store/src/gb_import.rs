@@ -167,6 +167,22 @@ pub async fn import_gb_document_atomic(
     run_id: IngestionRunId,
     document: &GbDocument,
 ) -> Result<GbImportReport, GbImportError> {
+    import_gb_document_atomic_with_hash(pool, source_id, run_id, document, None)
+        .await
+}
+
+/// Import a document with a stable SHA-256 identity of its original bytes.
+///
+/// Exact replays are no-ops. The receipt is committed in the same
+/// transaction as the readings, so failed imports cannot claim a hash.
+/// Legacy callers may omit the identity while migration is in progress.
+pub async fn import_gb_document_atomic_with_hash(
+    pool: &Pool<MySql>,
+    source_id: AcquisitionSourceId,
+    run_id: IngestionRunId,
+    document: &GbDocument,
+    document_sha256: Option<&str>,
+) -> Result<GbImportReport, GbImportError> {
     let meters = prepare(document)?;
     let mut tx = pool.begin().await.map_err(StoreError::from)?;
 
@@ -191,6 +207,36 @@ pub async fn import_gb_document_atomic(
     .map_err(StoreError::from)?;
     if run_source != Some(source_id.0) {
         return Err(GbImportError::InvalidRelationships);
+    }
+
+    if let Some(hash) = document_sha256 {
+        if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(GbImportError::InvalidRelationships);
+        }
+        // The source lock serializes cooperating imports before this lookup.
+        let prior: Option<u64> = sqlx::query_scalar(
+            "SELECT id FROM import_document WHERE acquisition_source_id = ? \
+             AND sha256_hex = ?",
+        )
+        .bind(source_id.0)
+        .bind(hash)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(StoreError::from)?;
+        if prior.is_some() {
+            return Ok(GbImportReport::default());
+        }
+        sqlx::query(
+            "INSERT INTO import_document \
+             (acquisition_source_id, sha256_hex, first_ingestion_run_id) \
+             VALUES (?, ?, ?)",
+        )
+        .bind(source_id.0)
+        .bind(hash)
+        .bind(run_id.0)
+        .execute(&mut *tx)
+        .await
+        .map_err(StoreError::from)?;
     }
 
     let mut report = GbImportReport::default();

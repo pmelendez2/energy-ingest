@@ -3,11 +3,11 @@
 # Validate the actual customer installation archive before publication.
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-[[ $# -eq 1 ]] || {
-    echo "Usage: $0 VERSION" >&2
+[[ $# -le 1 ]] || {
+    echo "Usage: $0 [VERSION]" >&2
     exit 2
 }
-version="$1"
+version="${1:-$(<"$root/release/VERSION")}"
 [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.[1-9][0-9]*)?$ ]] || {
     printf 'Expected version X.Y.Z or X.Y.Z-rc.N\n' >&2
     exit 2
@@ -39,7 +39,7 @@ required = {
     'scripts/setup-prod.sh',
     'scripts/verify-prod.sh',
     'scripts/prod-api-common.sh',
-    'scripts/import-prod.sh',
+    'scripts/internal/import-files.sh',
     'scripts/register-prod.sh',
     'scripts/meter-prod.sh',
     'scripts/analyze-prod-data.sh',

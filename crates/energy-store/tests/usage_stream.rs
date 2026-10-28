@@ -19,6 +19,8 @@ fn candidate(id: u64, hour: u32, duration: u32, value: i64) -> StreamCandidate {
         interval_duration_seconds: duration,
         reading_value: Some(value),
         reading_quality: Some("verified".into()),
+        source_published_at: None,
+        source_updated_at: None,
         accumulation_behaviour: Some(4),
         commodity: Some(1),
         data_qualifier: Some(0),
@@ -28,6 +30,52 @@ fn candidate(id: u64, hour: u32, duration: u32, value: i64) -> StreamCandidate {
         power_of_ten_multiplier: Some(0),
         unit_of_measure: Some(72),
     }
+}
+
+fn dated(mut c: StreamCandidate, day: u32) -> StreamCandidate {
+    c.source_updated_at = Some(
+        NaiveDateTime::parse_from_str(
+            &format!("2026-10-{day:02} 12:00:00"),
+            "%Y-%m-%d %H:%M:%S",
+        )
+        .unwrap(),
+    );
+    c
+}
+
+#[test]
+fn newer_source_revision_wins_independent_of_resource_id() {
+    let result = resolve_candidates(vec![
+        dated(candidate(20, 0, 3600, 150), 6),
+        dated(candidate(3, 0, 3600, 175), 27),
+    ]);
+    assert!(result.issues.is_empty());
+    assert_eq!(result.intervals[0].raw_value, 175);
+    assert_eq!(result.intervals[0].meter_reading_id, 3);
+}
+
+#[test]
+fn late_import_of_older_source_does_not_reverse_correction() {
+    let result = resolve_candidates(vec![
+        dated(candidate(3, 0, 3600, 175), 27),
+        dated(candidate(99, 0, 3600, 150), 6),
+    ]);
+    assert!(result.issues.is_empty());
+    assert_eq!(result.intervals[0].raw_value, 175);
+}
+
+#[test]
+fn unknown_or_equal_source_order_blocks_differing_values() {
+    let unknown = resolve_candidates(vec![
+        candidate(1, 0, 3600, 150),
+        dated(candidate(2, 0, 3600, 175), 27),
+    ]);
+    assert!(unknown.intervals.is_empty());
+    let equal = resolve_candidates(vec![
+        dated(candidate(1, 0, 3600, 150), 27),
+        dated(candidate(2, 0, 3600, 175), 27),
+    ]);
+    assert!(equal.intervals.is_empty());
 }
 
 #[test]

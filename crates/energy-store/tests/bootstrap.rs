@@ -39,7 +39,7 @@ async fn database_bootstrap_is_repeatable() {
         .expect("initial database bootstrap should succeed");
 
     assert_eq!(
-        first.verified_tables, 16,
+        first.verified_tables, 17,
         "bootstrap should verify all expected application tables"
     );
 

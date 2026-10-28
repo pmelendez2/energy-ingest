@@ -8,9 +8,10 @@ use std::{env, path::PathBuf, process::ExitCode};
 
 use energy_store::{
     AcquisitionSourceId, GbImportReport, create_ingestion_run,
-    import_gb_document_atomic,
+    import_gb_document_atomic_with_hash,
 };
-use gb::{GbDocument, parse_file};
+use gb::{GbDocument, parse_reader};
+use sha2::{Digest, Sha256};
 use sqlx::MySqlPool;
 
 const USAGE: &str = "\
@@ -117,12 +118,17 @@ async fn run(args: &[String]) -> Result<(), String> {
         print!("{USAGE}");
         return Ok(());
     };
-    let mut documents: Vec<(PathBuf, GbDocument)> = Vec::new();
+    let mut documents: Vec<(PathBuf, GbDocument, String)> = Vec::new();
     for file in &args.files {
-        let doc = parse_file(file).map_err(|_| {
+        // Parse and fingerprint the same bytes; a source file must not
+        // change between parsing and identity calculation.
+        let bytes = std::fs::read(file)
+            .map_err(|_| format!("Cannot read {}", file.display()))?;
+        let doc = parse_reader(bytes.as_slice()).map_err(|_| {
             format!("GB XML parsing failed: {}", file.display())
         })?;
-        documents.push((file.clone(), doc));
+        let hash = format!("{:x}", Sha256::digest(&bytes));
+        documents.push((file.clone(), doc, hash));
     }
     let url = env::var("ENGY_DB_URL")
         .map_err(|_| "ENGY_DB_URL is required".to_owned())?;
@@ -136,17 +142,18 @@ async fn run(args: &[String]) -> Result<(), String> {
     );
     println!("{}", "-".repeat(68));
     let mut total = GbImportReport::default();
-    for (path, document) in documents {
+    for (path, document, hash) in documents {
         // Run IDs are created only after all XML inputs have parsed.
         let run_id =
             create_ingestion_run(&pool, AcquisitionSourceId(args.source_id))
                 .await
                 .map_err(|_| "could not create ingestion run".to_owned())?;
-        let report = import_gb_document_atomic(
+        let report = import_gb_document_atomic_with_hash(
             &pool,
             AcquisitionSourceId(args.source_id),
             run_id,
             &document,
+            Some(&hash),
         )
         .await
         .map_err(|_| {
