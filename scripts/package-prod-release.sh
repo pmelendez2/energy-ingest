@@ -22,7 +22,7 @@ files=(
   scripts/prod-api-common.sh
   scripts/verify-prod.sh
   scripts/register-prod.sh
-  scripts/import-prod.sh
+  scripts/internal/import-files.sh
   scripts/energy-import.sh
   scripts/meter-prod.sh
   scripts/analyze-prod-data.sh

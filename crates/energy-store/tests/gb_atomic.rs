@@ -5,7 +5,7 @@
 
 use energy_store::{
     create_acquisition_source, create_data_custodian, create_ingestion_run,
-    import_gb_document_atomic,
+    import_gb_document_atomic, import_gb_document_atomic_with_hash,
 };
 use gb::{
     GbDocument, IntervalBlockRecord, IntervalReadingRecord, MeterReadingRecord,
@@ -52,6 +52,70 @@ fn document(block_name: &str, value: i64) -> GbDocument {
             }],
         }],
     }
+}
+
+#[tokio::test]
+async fn exact_document_replay_preserves_first_successful_import() {
+    let url = std::env::var("ENGY_T_DB_URL")
+        .expect("isolated ENGY_T_DB_URL is required");
+    let pool = MySqlPool::connect(&url).await.unwrap();
+    let suffix = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos(),
+    );
+    let custodian = create_data_custodian(
+        &pool,
+        &format!("replay-test-custodian-{suffix}"),
+    )
+    .await
+    .unwrap();
+    let source = create_acquisition_source(
+        &pool,
+        custodian,
+        &format!("replay-test-source-{suffix}"),
+    )
+    .await
+    .unwrap();
+    let first = create_ingestion_run(&pool, source).await.unwrap();
+    let hash = "a".repeat(64);
+    let input = document("replay-block", 11);
+    let report = import_gb_document_atomic_with_hash(
+        &pool,
+        source,
+        first,
+        &input,
+        Some(&hash),
+    )
+    .await
+    .unwrap();
+    assert_eq!(report.accepted, 1);
+
+    let second = create_ingestion_run(&pool, source).await.unwrap();
+    let replay = import_gb_document_atomic_with_hash(
+        &pool,
+        source,
+        second,
+        &input,
+        Some(&hash),
+    )
+    .await
+    .unwrap();
+    assert_eq!(replay.observations, 0);
+    assert_eq!(replay.accepted, 0);
+    let retained: u64 = sqlx::query_scalar(
+        "SELECT first_ingestion_run_id FROM import_document \
+         WHERE acquisition_source_id = ? AND sha256_hex = ?",
+    )
+    .bind(source.0)
+    .bind(&hash)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(retained, first.0);
 }
 
 #[tokio::test]

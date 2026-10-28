@@ -13,7 +13,7 @@ see [Installation](INSTALLATION.md).
 
 1. Clean Git tree, code review, and `scripts/check-publication.sh`.
 2. `./deploy/docker-compose/test.sh` (isolated Rust test suite).
-3. `bash scripts/check-prod-package.sh X.Y.Z` to validate the exact
+3. `bash scripts/check-prod-package.sh` to validate the intended
    production installer ZIP, image reference, executable modes, and scripts.
 4. `docker build -f docker/Dockerfile.prod -t energy-ingest:release-check .`.
 5. `./scripts/check-prod-image.sh energy-ingest:release-check`.
@@ -28,6 +28,12 @@ see [Installation](INSTALLATION.md).
 11. Verify the source is on `main` and GitHub checks have passed.
 
 ## Publishing
+
+The intended stable release version is stored in `release/VERSION`.
+Run `bash scripts/check-prod-package.sh` without arguments to validate it.
+Before publishing, ensure that the signed release tag agrees with this
+version. Explicit versions remain supported for private release candidates
+and historical reproduction.
 
 Publish only by pushing an annotated `energy-ingest-vX.Y.Z` tag.
 The Docker workflow pushes AMD64 and ARM64 version tags, not `latest`.

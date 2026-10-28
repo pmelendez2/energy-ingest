@@ -27,7 +27,6 @@ COMPOSE=(
 # shellcheck source=scripts/prod-api-common.sh
 source "$SCRIPT_DIR/prod-api-common.sh"
 
-
 die() {
     printf 'Error: %s\n' "$*" >&2
     exit 1

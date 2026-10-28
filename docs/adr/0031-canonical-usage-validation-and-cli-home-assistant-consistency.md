@@ -3,7 +3,7 @@
 
 # ADR-0031: Canonical Usage Validation and CLI/Home Assistant Consistency
 
-- **Status:** Accepted
+- Status: Accepted
 - **Date:** 2026-10-20
 
 ## Context

@@ -43,20 +43,18 @@ verification step. Avoid repeating registration unnecessarily.
 
 ## Import a utility export
 
-Place the downloaded XML file in your configured private import folder.
-The default is `deploy/docker-compose/private-imports`.
+Keep your original XML files in a private folder outside the installation.
+The guided importer stages secure copies only with your consent.
 
 ```bash
-./scripts/import-prod.sh --file usage-export.xml
+./scripts/energy-import.sh --file usage-export.xml
 ```
 
 Replace the filename with the downloaded XML filename. If you use a
 custom folder, add `--import-dir /path/to/your/folder`.
 
-The original XML file is mounted read-only. Preserve it privately for
-possible reimport. Successful reimport of the same data should not
-create duplicate canonical readings; the importer manages revisions
-and overlap.
+The original XML file remains unchanged and outside installation cleanup.
+Identical reimports must not change canonical readings or precedence.
 
 ## Review import results
 
@@ -72,16 +70,15 @@ It will use the authenticated application API, not MariaDB access.
 
 ## Preview and import multiple files
 
-Preview the files selected from your download directory:
+Select multiple files from your download directory interactively:
 
 ```bash
-./scripts/import-prod.sh \
+./scripts/energy-import.sh \
   --import-dir "$HOME/energy_usage/data" \
-  --file "*.xml" \
-  --list-files
+  --file '*.xml'
 ```
 
-After reviewing the list, remove `--list-files` to import them.
+Review the file list and confirm staging and import when prompted.
 Only use a source ID that matches the provider and acquisition source
 for every selected file. Split files by source if necessary.
 

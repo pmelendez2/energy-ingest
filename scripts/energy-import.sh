@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 #
 # Guided import of Green Button XML files into the production database.
-# Uses the existing production import and meter-management scripts.
+# Uses the internal import job and meter-management scripts.
 
 set -euo pipefail
 
@@ -20,7 +20,7 @@ Usage: ./scripts/energy-import.sh [--import-dir DIR] [--file GLOB]
                                   [--source-id ID]
 
 Guided, interactive import. The default file pattern is '*.xml'.
-For noninteractive imports, use import-prod.sh with prepared files.
+Imports use private staging; originals remain outside the installation.
 HELP
 }
 
@@ -533,7 +533,7 @@ for name in "${files[@]}"; do
     import_args+=(--file "$name")
 done
 
-"$SCRIPT_DIR/import-prod.sh" "${import_args[@]}"
+"$SCRIPT_DIR/internal/import-files.sh" "${import_args[@]}"
 
 
 # Physical-meter association is required to complete guided onboarding.

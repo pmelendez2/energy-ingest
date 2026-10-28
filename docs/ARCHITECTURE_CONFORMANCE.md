@@ -78,6 +78,7 @@ The index below is intentionally maintained at the ADR level rather than assigni
 | ADR-0028 | Pending | Pending |
 | ADR-0029 | Pending | Pending |
 | ADR-0030 | Pending | Pending |
+| ADR-0031 | `crates/energy-store/src/usage_stream.rs`; `crates/energy-store/tests/usage_stream.rs`; `crates/energy-store/src/window_fingerprint.rs`; `crates/energy-api/src/` | Automated + Review |
 
 ## Review Process
 

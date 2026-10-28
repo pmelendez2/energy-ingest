@@ -45,7 +45,7 @@ To import from a user directory, supply a **WSL2-accessible path**.
 For example:
 
 ```bash
-./scripts/import-prod.sh --source-id 42 \
+./scripts/energy-import.sh --source-id 42 \
     --import-dir /mnt/c/Users/YourName/EnergyXML \
     --file usage-export.xml
 ```
