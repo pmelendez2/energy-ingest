@@ -62,7 +62,7 @@ Production images are published for `linux/amd64` and `linux/arm64`.
 The current development release target is recorded once in
 [`release/VERSION`](release/VERSION). It is not necessarily published yet.
 For installation, select the most recent stable
-[GitHub release](https://github.com/pmelendez2/energy_ingest/releases).
+[GitHub release](https://github.com/pmelendez2/energy-ingest/releases).
 
 - Image: `docker.io/pmelendez2/gb-energy-ingest:<release-version>`.
 - [Installation](docs/INSTALLATION.md) and

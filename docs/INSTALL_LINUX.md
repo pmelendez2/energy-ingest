@@ -17,14 +17,14 @@ or host MariaDB installation is required.
 ## Download the official production release
 
 Select the current stable version from the
-[official releases](https://github.com/pmelendez2/energy_ingest/releases).
+[official releases](https://github.com/pmelendez2/energy-ingest/releases).
 Set `version` to that **published** release number. The development target
 recorded in `release/VERSION` may not be published yet. Do not use it until
 the corresponding GitHub release and container image exist.
 
 ```bash
 version=REPLACE_WITH_PUBLISHED_VERSION
-base="https://github.com/pmelendez2/energy_ingest/releases/download/energy-ingest-v${version}"
+base="https://github.com/pmelendez2/energy-ingest/releases/download/energy-ingest-v${version}"
 mkdir -p "$HOME/energy-ingest-prod"
 cd "$HOME/energy-ingest-prod"
 curl -fLO "$base/energy-ingest-prod-${version}.zip"
