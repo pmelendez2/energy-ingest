@@ -8,7 +8,7 @@
 
 **Intended Audience:** Developers, contributors, and CI maintainers.
 
-`energy_ingest` uses Docker Compose as the reference development and test
+`energy-ingest` uses Docker Compose as the reference development and test
 environment.
 
 The host requires:
@@ -32,16 +32,16 @@ required. In particular, the public development workflow does not depend on a
 `homelab-tools` parent repository or a path such as:
 
 ```text
-~/src/hlt/energy_ingest
+~/src/hlt/energy-ingest
 ```
 
 Valid examples include:
 
 ```text
-~/energy_ingest
-~/projects/energy_ingest
-/opt/src/energy_ingest
-/tmp/energy_ingest
+~/energy-ingest
+~/projects/energy-ingest
+/opt/src/energy-ingest
+/tmp/energy-ingest
 ```
 
 The supported workflow is:
@@ -154,8 +154,8 @@ The project working directory is selected relative to that Git root.
 
 This supports both:
 
-- a standalone `energy_ingest` clone; and
-- an `energy_ingest` directory inside a larger local Git repository.
+- a standalone `energy-ingest` clone; and
+- an `energy-ingest` directory inside a larger local Git repository.
 
 The larger-repository case is a local development convenience only. It is not
 a requirement for release users.
