@@ -30,10 +30,18 @@ see [Installation](INSTALLATION.md).
 ## Publishing
 
 The intended stable release version is stored in `release/VERSION`.
-Run `bash scripts/check-prod-package.sh` without arguments to validate it.
-Before publishing, ensure that the signed release tag agrees with this
-version. Explicit versions remain supported for private release candidates
-and historical reproduction.
+Stable production packages and public release tags must match this
+version. Run `bash scripts/check-prod-package.sh` without arguments
+to validate the intended stable package.
+
+Private release candidates use an explicit `X.Y.Z-rc.N` version.
+The private RC publisher validates the requested version, requires
+a clean and synchronized `main` checkout, and checks that the
+requested registry tag does not already exist.
+
+Historical release reproduction requires the appropriate source
+checkout and release metadata. Do not treat a current source
+checkout as equivalent to a historical release.
 
 Publish only by pushing an annotated `energy-ingest-vX.Y.Z` tag.
 The Docker workflow pushes AMD64 and ARM64 version tags, not `latest`.

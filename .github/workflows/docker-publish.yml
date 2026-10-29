@@ -22,6 +22,11 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF_NAME" =~ ^energy-ingest-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || exit 1
+          expected="energy-ingest-v$(<release/VERSION)"
+          if [[ "$GITHUB_REF_NAME" != "$expected" ]]; then
+            echo "ERROR: tag differs from release/VERSION" >&2
+            exit 1
+          fi
           git fetch origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - name: Run isolated verification
