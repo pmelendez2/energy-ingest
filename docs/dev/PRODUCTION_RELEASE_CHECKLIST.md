@@ -12,20 +12,39 @@ see [Installation](../INSTALLATION.md).
 ## Mandatory checks before tagging
 
 1. Clean Git tree, code review, and `scripts/check-publication.sh`.
-2. `./deploy/docker-compose/test.sh` (isolated Rust test suite).
-3. `bash scripts/check-prod-package.sh` to validate the intended
+2. `bash scripts/audit-dependencies.sh` (RustSec audit).
+3. `./deploy/docker-compose/test.sh` (isolated Rust test suite).
+4. `bash scripts/check-prod-package.sh` to validate the intended
    production installer ZIP, image reference, executable modes, and scripts.
-4. `docker build -f docker/Dockerfile.prod -t energy-ingest:release-check .`.
-5. `./scripts/check-prod-image.sh energy-ingest:release-check`.
-6. `./scripts/audit-prod-release.sh energy-ingest:release-check`.
-7. `ENGY_TEST_IMAGE=energy-ingest:release-check ./scripts/test-prod-runtime.sh`.
-8. `ENGY_TEST_IMAGE=energy-ingest:release-check \
+5. `docker build -f docker/Dockerfile.prod -t energy-ingest:release-check .`.
+6. `./scripts/check-prod-image.sh energy-ingest:release-check`.
+7. `./scripts/audit-prod-release.sh energy-ingest:release-check`.
+8. `ENGY_TEST_IMAGE=energy-ingest:release-check ./scripts/test-prod-runtime.sh`.
+9. `ENGY_TEST_IMAGE=energy-ingest:release-check \
    bash scripts/test-prod-e2e.sh` using approved sanitized XML.
    Confirm identical reimport, utility meter-number persistence/privacy,
    and rejection of conflicting resource ownership.
-9. ARM64 Buildx build and administrative CLI/root-denial smoke tests.
-10. Review critical CVE findings, build inputs, SBOM, and provenance.
-11. Verify the source is on `main` and GitHub checks have passed.
+10. ARM64 Buildx build and administrative CLI/root-denial smoke tests.
+11. Review critical CVE findings, build inputs, SBOM, and provenance.
+12. Verify the source is on `main` and GitHub checks have passed.
+
+## v0.1.8 release gate
+
+Before tagging, run `bash scripts/audit-dependencies.sh` and
+`bash scripts/test-prod-release-versions.sh` in addition to the
+mandatory checks above. CI also audits Rust dependencies.
+
+After publication, the Docker workflow runs
+`scripts/verify-published-image.sh` against the expected registry digest
+and verifies both `linux/amd64` and `linux/arm64`. Its success summary
+is written only after this check passes. Inspect the completed workflow
+and verify the image tag and digest before upgrading production.
+
+For an existing `piha-w` installation, retain the current Compose
+project, MariaDB volume, application credentials, and imported readings.
+Do not use database-reset or teardown commands during the upgrade.
+Verify the API response includes the expected utility-company name,
+then validate Home Assistant integration against the upgraded API.
 
 ## Publishing
 

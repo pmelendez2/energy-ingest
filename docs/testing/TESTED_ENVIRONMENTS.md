@@ -241,3 +241,16 @@ At minimum, record:
 
 Do not infer support from this file for environments that were not actually
 tested.
+
+## 2026-10-30 — v0.1.8 release preparation
+
+The maintainer ran the isolated Docker verification workflow on the
+`sparta` development host: 209 tests passed, including compilation,
+formatting, Clippy, unit and integration tests, documentation checks,
+ADR conformance, and production package validation. The RustSec
+`cargo-audit` scan reported no vulnerabilities. PR #31 CI and secret
+scanning passed before merge commit `9522d05`.
+
+This evidence applies to the source changes merged in PR #31. The
+v0.1.8 registry image, native Raspberry Pi deployment, and Home
+Assistant compatibility have not yet been verified.
