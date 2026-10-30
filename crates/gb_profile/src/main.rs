@@ -10,7 +10,7 @@ use std::error::Error;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use zip::write::FileOptions;
+use zip::write::SimpleFileOptions;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -59,7 +59,7 @@ fn add_to_zip(
     src: &Path,
     name: &str,
 ) -> Result<()> {
-    let options = FileOptions::default()
+    let options = SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
     zip.start_file(name, options)?;
     let mut file = fs::File::open(src)?;
@@ -119,7 +119,7 @@ fn package(profile_dir: &Path, output: &Path) -> Result<()> {
         );
         writer.start_file(
             "submission.toml",
-            FileOptions::default()
+            SimpleFileOptions::default()
                 .compression_method(zip::CompressionMethod::Deflated),
         )?;
         writer.write_all(manifest.as_bytes())?;
