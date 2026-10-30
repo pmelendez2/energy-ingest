@@ -7,7 +7,7 @@ production container releases.
 **Intended Audience:** Release maintainers and CI/CD operators.
 
 This checklist is not an end-user installation guide. For installation
-see [Installation](INSTALLATION.md).
+see [Installation](../INSTALLATION.md).
 
 ## Mandatory checks before tagging
 
@@ -56,7 +56,7 @@ API query, ARM64 QEMU smoke tests, and multi-platform publication.
 The published image was separately pulled and executed natively on
 Raspberry Pi 5 `piha` (ARM64); the full database deployment on `piha`
 was not exercised. See
-[release validation](RELEASE_0_1_0_VALIDATION.md).
+[release validation](../testing/RELEASE_0_1_0_VALIDATION.md).
 
 Inspect the published index with:
 

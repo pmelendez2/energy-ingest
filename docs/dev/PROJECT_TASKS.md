@@ -40,7 +40,7 @@ Production Docker image `0.1.0` was published for AMD64 and ARM64.
 Run `38649034462` passed the security, runtime, XML-to-API, and ARM64
 QEMU release gates. The released image was also smoke-tested natively
 on Raspberry Pi 5 `piha`. See
-[release validation](RELEASE_0_1_0_VALIDATION.md).
+[release validation](../testing/RELEASE_0_1_0_VALIDATION.md).
 
 CI/CD follow-up: evaluate native ARM64 builds, BuildKit cache reuse,
 and eventually publish-by-digest so tested images are not rebuilt.

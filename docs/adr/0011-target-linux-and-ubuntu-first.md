@@ -36,7 +36,7 @@ Native local development remains supported when the required Rust toolchain and 
 
 A platform must not be described as tested merely because Rust or container tooling is theoretically portable to it.
 
-Actual tested environments and release validation belong in `docs/TESTED_ENVIRONMENTS.md` under ADR-0019.
+Actual tested environments and release validation belong in `docs/testing/TESTED_ENVIRONMENTS.md` under ADR-0019.
 
 The exact CI matrix, container image tags, package prerequisites, and host setup instructions are development/deployment documentation rather than ADR content.
 

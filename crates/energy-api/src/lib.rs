@@ -5,17 +5,23 @@
 
 use axum::{
     Json, Router,
+    body::Bytes,
+    extract::DefaultBodyLimit,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode, header},
     routing::{get, post},
 };
 use chrono::NaiveDateTime;
 use energy_store::{
-    HistoryWindow, MAX_WINDOW_CANDIDATES, StoreError, authenticate_api_token,
-    plan_history_refresh, resolve_meter_window, resolve_physical_meter_stream,
+    AcquisitionSourceId, HistoryWindow, MAX_WINDOW_CANDIDATES, StoreError,
+    authenticate_api_token, create_ingestion_run, get_acquisition_source,
+    import_gb_document_atomic_with_hash, plan_history_refresh,
+    resolve_meter_window, resolve_physical_meter_stream,
     summarize_meter_validation, window_fingerprint,
 };
+use gb::parse_reader;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use sqlx::{MySql, Pool};
 use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
@@ -96,6 +102,39 @@ async fn meters(
     .await
     .map_err(|_| failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error"))?;
     Ok(Json(items))
+}
+
+#[derive(Serialize, ToSchema, sqlx::FromRow)]
+struct AcquisitionSourceResponse {
+    id: u64,
+    name: String,
+    data_custodian_id: u64,
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/acquisition-sources",
+    responses(
+        (status = 200, description = "Configured acquisition sources",
+         body = Vec<AcquisitionSourceResponse>),
+        (status = 401, description = "Bearer token required",
+         body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn acquisition_sources(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<AcquisitionSourceResponse>>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    let sources = sqlx::query_as::<_, AcquisitionSourceResponse>(
+        "SELECT id, name, data_custodian_id \
+         FROM acquisition_source ORDER BY name, id",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|_| failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error"))?;
+    Ok(Json(sources))
 }
 
 #[derive(Serialize, ToSchema)]
@@ -500,17 +539,19 @@ async fn healthz() -> StatusCode {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(healthz, meters, stream, window, validation, history_plan),
+    paths(healthz, meters, acquisition_sources, stream, window, validation, history_plan,
+          import_green_button),
     components(schemas(
-        ErrorBody, Meter, IntervalResponse, IssueResponse, StreamResponse,
+        ErrorBody, Meter, AcquisitionSourceResponse, IntervalResponse, IssueResponse, StreamResponse,
         ValidationResponse, HistoryRangeInput, HistoryPreviousInput,
-        HistoryPlanRequest, HistoryActionResponse, HistoryPlanResponse
+        HistoryPlanRequest, HistoryActionResponse, HistoryPlanResponse,
+        ImportResult
     )),
     modifiers(&BearerSecurity),
     info(
         title = "Energy Ingest HTTP API",
         version = "0.1.0",
-        description = "Read-only physical meter and raw usage observations"
+        description = "Authenticated meter history and Green Button import"
     ),
 )]
 struct ApiDoc;
@@ -537,11 +578,90 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     ApiDoc::openapi()
 }
 
+/// A single authenticated Green Button XML import. The source ID is the
+/// existing acquisition-source identity, not a physical meter ID.
+/// The same atomic importer used by energy-store-import commits the file.
+const MAX_IMPORT_BYTES: usize = 8 * 1024 * 1024;
+
+#[derive(Debug, Deserialize)]
+struct ImportQuery {
+    source_id: u64,
+}
+
+#[derive(Serialize, ToSchema)]
+struct ImportResult {
+    observations: usize,
+    unchanged: usize,
+    accepted: usize,
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/imports/green-button",
+    params(("source_id" = u64, Query,
+             description = "Existing acquisition source ID")),
+    responses(
+        (status = 200, description = "XML committed", body = ImportResult),
+        (status = 400, description = "Invalid XML or source", body = ErrorBody),
+        (status = 401, description = "Bearer token required", body = ErrorBody),
+        (status = 404, description = "Source not found", body = ErrorBody),
+        (status = 413, description = "XML too large", body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn import_green_button(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ImportQuery>,
+    body: Bytes,
+) -> Result<Json<ImportResult>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    if query.source_id == 0 || body.is_empty() {
+        return Err(failure(StatusCode::BAD_REQUEST, "invalid_import"));
+    }
+    if body.len() > MAX_IMPORT_BYTES {
+        return Err(failure(StatusCode::PAYLOAD_TOO_LARGE, "file_too_large"));
+    }
+    let source = AcquisitionSourceId(query.source_id);
+    if get_acquisition_source(&state.pool, source)
+        .await
+        .map_err(store_failure)?
+        .is_none()
+    {
+        return Err(failure(StatusCode::NOT_FOUND, "source_not_found"));
+    }
+    let document = parse_reader(body.as_ref())
+        .map_err(|_| failure(StatusCode::BAD_REQUEST, "invalid_xml"))?;
+    let hash = format!("{:x}", Sha256::digest(&body));
+    let run = create_ingestion_run(&state.pool, source)
+        .await
+        .map_err(store_failure)?;
+    let report = import_gb_document_atomic_with_hash(
+        &state.pool,
+        source,
+        run,
+        &document,
+        Some(&hash),
+    )
+    .await
+    .map_err(|_| {
+        failure(StatusCode::UNPROCESSABLE_ENTITY, "import_rejected")
+    })?;
+    Ok(Json(ImportResult {
+        observations: report.observations,
+        unchanged: report.unchanged,
+        accepted: report.accepted,
+    }))
+}
+
 /// The health probe reveals no database or customer information.
 pub fn router(pool: Pool<MySql>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/v1/meters", get(meters))
+        .route("/v1/acquisition-sources", get(acquisition_sources))
+        .route("/v1/imports/green-button", post(import_green_button))
+        .layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES))
         .route("/v1/meters/{id}/stream", get(stream))
         .route("/v1/meters/{id}/validation", get(validation))
         .route("/v1/meters/{id}/window", get(window))
@@ -686,5 +806,18 @@ mod validation_contract_tests {
             previous: None,
         };
         assert!(history_inputs(&excessive).is_err());
+    }
+}
+
+#[cfg(test)]
+mod acquisition_source_api_contract_tests {
+    use super::*;
+
+    #[test]
+    fn source_catalog_is_documented() {
+        let doc = serde_json::to_value(openapi()).expect("OpenAPI JSON");
+        let path = &doc["paths"]["/v1/acquisition-sources"]["get"];
+        assert!(path.is_object());
+        assert!(path["security"].is_array());
     }
 }

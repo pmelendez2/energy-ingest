@@ -8,6 +8,8 @@ edition = "2024"
 axum = "0.8"
 chrono = "0.4"
 energy-store = { path = "../energy-store" }
+gb = { path = "../gb" }
+sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.9.0", default-features = false, features = ["mysql", "runtime-tokio"] }

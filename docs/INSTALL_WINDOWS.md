@@ -19,7 +19,7 @@ PowerShell alone cannot execute these scripts directly.
 The `0.1.0` container image includes Linux AMD64 and ARM64 platforms.
 The Windows/WSL2 installation path below is guidance only; it has not
 been validated for this release. See
-[release validation](RELEASE_0_1_0_VALIDATION.md).
+[release validation](testing/RELEASE_0_1_0_VALIDATION.md).
 
 ## Installation
 

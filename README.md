@@ -67,8 +67,8 @@ For installation, select the most recent stable
 - Image: `docker.io/pmelendez2/gb-energy-ingest:<release-version>`.
 - [Installation](docs/INSTALLATION.md) and
   [Linux setup](docs/INSTALL_LINUX.md).
-- [Published release evidence](docs/RELEASE_0_1_0_VALIDATION.md).
-- [Production release checklist](docs/PRODUCTION_RELEASE_CHECKLIST.md).
+- [Published release evidence](docs/testing/RELEASE_0_1_0_VALIDATION.md).
+- [Production release checklist](docs/dev/PRODUCTION_RELEASE_CHECKLIST.md).
 
 Consult source and tests for current feature readiness.
 
@@ -76,13 +76,13 @@ Consult source and tests for current feature readiness.
 
 - [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — canonical terms, including
   distinctions among schema changes, data movement, and backup/restore.
-- [`docs/DEVELOPMENT_ENVIRONMENT.md`](docs/DEVELOPMENT_ENVIRONMENT.md)
+- [`docs/dev/DEVELOPMENT_ENVIRONMENT.md`](docs/dev/DEVELOPMENT_ENVIRONMENT.md)
   — local development and verification with Docker Compose.
 - [`profiles/README.md`](profiles/README.md) — provider profiles,
   validation, and contributions.
-- [`docs/PROFILE_RELEASES.md`](docs/PROFILE_RELEASES.md) — releases of
+- [`docs/dev/PROFILE_RELEASES.md`](docs/dev/PROFILE_RELEASES.md) — releases of
   the standalone `gb_profile` utility, not provider-profile revisions.
-- [`docs/PROJECT_TASKS.md`](docs/PROJECT_TASKS.md) — active and deferred work.
+- [`docs/dev/PROJECT_TASKS.md`](docs/dev/PROJECT_TASKS.md) — active and deferred work.
 - [`docs/adr/`](docs/adr/) — accepted architecture decisions.
 - [`docs/testing/TEST_STRATEGY.md`](docs/testing/TEST_STRATEGY.md) and
   [`docs/testing/TEST_PLAN.md`](docs/testing/TEST_PLAN.md) — testing policy.
