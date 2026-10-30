@@ -390,3 +390,80 @@ async fn insert_with_id(
         .unwrap()
         .last_insert_id()
 }
+
+#[tokio::test]
+async fn associations_are_idempotent_and_concurrency_safe() {
+    use energy_store::{
+        AssociationError as E, AssociationOutcome as O,
+        associate_meter_resource as associate,
+    };
+    let url = std::env::var("ENGY_T_DB_URL")
+        .expect("ENGY_T_DB_URL required for integration tests");
+    let pool = Pool::<MySql>::connect(&url).await.unwrap();
+    energy_store::migrate(&pool).await.unwrap();
+    let label = format!(
+        "association-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let mut fixture = Fixture::new(&pool, &label).await;
+    let resource = fixture.resource(1).await;
+    let gas_resource = fixture.resource(7).await;
+    let first = fixture.meter(1).await;
+    let second = fixture.meter(1).await;
+    let gas_meter = fixture.meter(7).await;
+    assert_eq!(associate(&pool, 0, resource).await, Err(E::InvalidId));
+    assert_eq!(
+        associate(&pool, u64::MAX, resource).await,
+        Err(E::MeterNotFound)
+    );
+    assert_eq!(
+        associate(&pool, first, u64::MAX).await,
+        Err(E::ResourceNotFound)
+    );
+    assert_eq!(
+        associate(&pool, gas_meter, resource).await,
+        Err(E::IdentityMismatch)
+    );
+    assert_eq!(
+        associate(&pool, first, gas_resource).await,
+        Err(E::IdentityMismatch)
+    );
+    let other_label = format!("{label}-other");
+    let mut other = Fixture::new(&pool, &other_label).await;
+    let other_meter = other.meter(1).await;
+    assert_eq!(
+        associate(&pool, other_meter, resource).await,
+        Err(E::IdentityMismatch)
+    );
+    other.cleanup().await;
+    // Both calls race for the same resource row. Exactly one can win.
+    let (a, b) = tokio::join!(
+        associate(&pool, first, resource),
+        associate(&pool, second, resource)
+    );
+    let outcomes = [a, b];
+    assert_eq!(outcomes.iter().filter(|v| **v == Ok(O::Associated)).count(), 1);
+    assert_eq!(
+        outcomes.iter().filter(|v| **v == Err(E::AssignedElsewhere)).count(),
+        1
+    );
+    let winner = if outcomes[0] == Ok(O::Associated) { first } else { second };
+    assert_eq!(
+        associate(&pool, winner, resource).await,
+        Ok(O::AlreadyAssociated)
+    );
+    let count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM physical_meter_resource \
+         WHERE meter_reading_id = ?",
+    )
+    .bind(resource)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(count.0, 1);
+    fixture.cleanup().await;
+}

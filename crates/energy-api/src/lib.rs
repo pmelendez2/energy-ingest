@@ -13,8 +13,9 @@ use axum::{
 };
 use chrono::NaiveDateTime;
 use energy_store::{
-    AcquisitionSourceId, HistoryWindow, MAX_WINDOW_CANDIDATES, StoreError,
-    authenticate_api_token, create_ingestion_run, get_acquisition_source,
+    AcquisitionSourceId, AssociationError, AssociationOutcome, HistoryWindow,
+    MAX_WINDOW_CANDIDATES, StoreError, authenticate_api_token,
+    create_ingestion_run, get_acquisition_source,
     import_gb_document_atomic_with_hash, plan_history_refresh,
     resolve_meter_window, resolve_physical_meter_stream,
     summarize_meter_validation, window_fingerprint,
@@ -102,6 +103,74 @@ async fn meters(
     .await
     .map_err(|_| failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error"))?;
     Ok(Json(items))
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+struct AttachResourceRequest {
+    resource_id: u64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+struct AttachResourceResponse {
+    meter_id: u64,
+    resource_id: u64,
+    status: &'static str,
+}
+
+#[utoipa::path(
+    post,
+    path = "/v1/meters/{id}/resources",
+    request_body = AttachResourceRequest,
+    responses(
+        (status = 200, body = AttachResourceResponse),
+        (status = 400, body = ErrorBody),
+        (status = 401, body = ErrorBody),
+        (status = 404, body = ErrorBody),
+        (status = 409, body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn attach_meter_resource(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(meter_id): Path<u64>,
+    Json(request): Json<AttachResourceRequest>,
+) -> Result<Json<AttachResourceResponse>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    let outcome = energy_store::associate_meter_resource(
+        &state.pool,
+        meter_id,
+        request.resource_id,
+    )
+    .await
+    .map_err(|error| match error {
+        AssociationError::InvalidId => {
+            failure(StatusCode::BAD_REQUEST, "invalid_id")
+        }
+        AssociationError::MeterNotFound => {
+            failure(StatusCode::NOT_FOUND, "meter_not_found")
+        }
+        AssociationError::ResourceNotFound => {
+            failure(StatusCode::NOT_FOUND, "resource_not_found")
+        }
+        AssociationError::IdentityMismatch => {
+            failure(StatusCode::CONFLICT, "meter_resource_mismatch")
+        }
+        AssociationError::AssignedElsewhere => {
+            failure(StatusCode::CONFLICT, "resource_assigned")
+        }
+        AssociationError::Database => {
+            failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error")
+        }
+    })?;
+    Ok(Json(AttachResourceResponse {
+        meter_id,
+        resource_id: request.resource_id,
+        status: match outcome {
+            AssociationOutcome::Associated => "associated",
+            AssociationOutcome::AlreadyAssociated => "already_associated",
+        },
+    }))
 }
 
 #[derive(Serialize, ToSchema, sqlx::FromRow)]
@@ -543,10 +612,11 @@ async fn healthz() -> StatusCode {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(healthz, meters, acquisition_sources, stream, window, validation, history_plan,
+    paths(healthz, meters, attach_meter_resource, acquisition_sources, stream, window, validation, history_plan,
           import_green_button),
     components(schemas(
-        ErrorBody, Meter, AcquisitionSourceResponse, IntervalResponse, IssueResponse, StreamResponse,
+        ErrorBody, Meter, AttachResourceRequest, AttachResourceResponse,
+        AcquisitionSourceResponse, IntervalResponse, IssueResponse, StreamResponse,
         ValidationResponse, HistoryRangeInput, HistoryPreviousInput,
         HistoryPlanRequest, HistoryActionResponse, HistoryPlanResponse,
         ImportResult
@@ -663,6 +733,7 @@ pub fn router(pool: Pool<MySql>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/v1/meters", get(meters))
+        .route("/v1/meters/{id}/resources", post(attach_meter_resource))
         .route("/v1/acquisition-sources", get(acquisition_sources))
         .route("/v1/imports/green-button", post(import_green_button))
         .layer(DefaultBodyLimit::max(MAX_IMPORT_BYTES))
