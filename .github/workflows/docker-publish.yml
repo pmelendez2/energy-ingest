@@ -29,6 +29,8 @@ jobs:
           fi
           git fetch origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Audit Rust dependencies
+        run: bash scripts/audit-dependencies.sh --install
       - name: Run isolated verification
         run: bash deploy/docker-compose/test.sh
       - name: Build production image for smoke testing
@@ -145,10 +147,20 @@ jobs:
             type=gha,scope=energy-prod-arm64
             type=gha,scope=energy-prod
           cache-to: type=gha,mode=max,scope=energy-prod
-      - name: Record image digest
+      - name: Verify published Docker Hub platforms
+        shell: bash
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
-        run: echo "pmelendez2/gb-energy-ingest@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#energy-ingest-v}"
+          image="docker.io/pmelendez2/gb-energy-ingest:${version}"
+          bash scripts/verify-published-image.sh "$image" "$DIGEST"
+          {
+            echo "[OK] Published to Docker Hub: $image"
+            echo "Platforms: linux/amd64, linux/arm64"
+            echo "Digest: $DIGEST"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
   github-release:
     needs: publish

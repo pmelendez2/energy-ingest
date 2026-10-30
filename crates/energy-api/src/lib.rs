@@ -109,6 +109,7 @@ struct AcquisitionSourceResponse {
     id: u64,
     name: String,
     data_custodian_id: u64,
+    utility_company: String,
 }
 
 #[utoipa::path(
@@ -128,8 +129,11 @@ async fn acquisition_sources(
 ) -> Result<Json<Vec<AcquisitionSourceResponse>>, ApiError> {
     require_auth(&state.pool, &headers).await?;
     let sources = sqlx::query_as::<_, AcquisitionSourceResponse>(
-        "SELECT id, name, data_custodian_id \
-         FROM acquisition_source ORDER BY name, id",
+        "SELECT src.id, src.name, src.data_custodian_id, \
+         dc.name AS utility_company \
+         FROM acquisition_source src \
+         JOIN data_custodian dc ON dc.id = src.data_custodian_id \
+         ORDER BY dc.name, src.name, src.id",
     )
     .fetch_all(&state.pool)
     .await
