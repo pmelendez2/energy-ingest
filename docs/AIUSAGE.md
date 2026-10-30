@@ -48,8 +48,31 @@ changes in annotations or the applicable release history.
 
 | Release | AI Tool | Model | Date Range |
 |---|---|---|---|
+| 0.1.8 (preparation) | ChatGPT | GPT-6 | 2026-10-30 |
 | 0.1.5-rc.1 | ChatGPT | GPT-6 | 2026-10-20 |
 | Unreleased / 0.1.0-dev | ChatGPT | GPT-5.6 Sol | 2026-09-28 - present |
+
+### 0.1.8 (release preparation)
+
+* AI Tool: ChatGPT
+* Model: GPT-6
+* Date Range: 2026-10-30
+* Maintainer Review: Required
+
+#### Areas of AI assistance
+
+- Acquisition-source API response and utility-company naming changes.
+- Rust dependency audit integration in hooks and CI.
+- Docker Hub digest and multi-platform publication verification.
+- Release documentation and verification instructions.
+
+#### Verification
+
+The maintainer reported 209 passing tests in the isolated Docker suite,
+a successful dependency audit, successful PR #31 CI and secret scans,
+and a verified signed merge commit on `main`. The v0.1.8 release tag,
+Docker Hub publication, native production upgrade, and Home Assistant
+integration validation have not yet been completed.
 
 ### 0.1.5-rc.1
 
