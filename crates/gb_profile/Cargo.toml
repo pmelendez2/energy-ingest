@@ -10,5 +10,5 @@ build = "build.rs"
 
 [dependencies]
 gb = { path = "../gb" }
-sha2 = "0.10"
+sha2 = "0.11"
 zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
