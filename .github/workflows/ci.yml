@@ -12,5 +12,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
+      - name: Verify production release versions
+        run: bash scripts/test-prod-release-versions.sh
       - name: Verify with isolated MariaDB
         run: bash deploy/docker-compose/test.sh

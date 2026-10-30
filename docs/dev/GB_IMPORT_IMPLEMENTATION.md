@@ -88,12 +88,12 @@ Rust CLI and database integration tests:
 1. Set up an isolated MariaDB database following
    [`DEVELOPMENT_ENVIRONMENT.md`](DEVELOPMENT_ENVIRONMENT.md).
 2. Apply schema migrations following
-   [`DATABASE_BOOTSTRAP.md`](DATABASE_BOOTSTRAP.md).
+   [`DATABASE_BOOTSTRAP.md`](../DATABASE_BOOTSTRAP.md).
 3. Load the private test connection URL into `ENGY_DB_URL`; keep credentials
    outside Git and do not paste them into issue reports.
 4. Install the documented development Rust toolchain.
 5. Use authorized local XML samples. Never commit customer exports. Consult
-   [`PRIVACY_SANITIZATION.md`](PRIVACY_SANITIZATION.md) before considering
+   [`PRIVACY_SANITIZATION.md`](../PRIVACY_SANITIZATION.md) before considering
    fixtures for publication.
 6. Register a custodian and acquisition source using `energy-store-admin`,
    if your development database does not already contain them.
@@ -161,7 +161,7 @@ integration. A complete test matrix must cover rollback, contention,
 provider exports, overlap/corrections, and recovery. These are **project
 engineering requirements**, not extra installation steps for homeowners.
 
-`docs/PROJECT_TASKS.md` is temporary pre-first-release planning material. It
+`docs/dev/PROJECT_TASKS.md` is temporary pre-first-release planning material. It
 must not ship as a permanent public-release guide. After the first release,
 work items and defects should be tracked through GitHub Issues (and release
 milestones as appropriate), not a maintained backlog in this document.
@@ -224,3 +224,19 @@ fixed wall-clock thresholds to determine correctness. If a phase remains
 slow, inspect the corresponding SQL and use MariaDB `EXPLAIN` and existing
 schema indexes before proposing a new migration. Do not make production
 indexing changes based solely on integration-test wall-clock durations.
+
+## Authenticated HTTP import contract
+
+The authenticated `POST /v1/imports/green-button?source_id=ID`
+endpoint accepts one complete Green Button XML document as
+`application/xml` with the existing API bearer token. The
+request limit is 8 MiB. `source_id` identifies an existing
+acquisition source, not a meter. Successful imports report
+`observations`, `unchanged`, and `accepted` counts. The canonical
+revision-aware importer rejects invalid XML and source IDs; it
+does not fabricate missing observations. This is a write endpoint:
+review token permissions and deployment network boundaries before
+production use. Home Assistant handles browser file selection and
+Recorder synchronization separately; do not store utility login
+credentials in Energy Ingest. Test invalid sources, repeat imports,
+accepted corrections, authorization, and bounded payloads.

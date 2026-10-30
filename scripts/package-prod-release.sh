@@ -14,6 +14,14 @@ out_dir="$2"
 image="${ENGY_RELEASE_IMAGE:-docker.io/pmelendez2/gb-energy-ingest:$version}"
 [[ "$image" == *":$version" ]] || usage
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+expected_version="$(<"$root/release/VERSION")"
+
+if [[ "$version" != *-rc.* ]] &&
+   [[ "$version" != "$expected_version" ]]; then
+    printf 'ERROR: requested version %s differs from release/VERSION %s\n' \
+        "$version" "$expected_version" >&2
+    exit 1
+fi
 mkdir -p "$out_dir"
 out_dir="$(cd "$out_dir" && pwd)"
 archive="energy-ingest-prod-${version}.zip"

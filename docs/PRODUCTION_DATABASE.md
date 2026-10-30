@@ -180,7 +180,7 @@ image `docker.io/pmelendez2/gb-energy-ingest:0.1.0` using
 `ENGY_APP_IMAGE`. It is published for AMD64 and ARM64 Linux containers;
 production users do not need to build the Rust image locally.
 The full release checks, native Pi 5 smoke-test scope, and digest are
-recorded in [release validation](RELEASE_0_1_0_VALIDATION.md).
+recorded in [release validation](testing/RELEASE_0_1_0_VALIDATION.md).
 
 ## Production Administrative Image
 

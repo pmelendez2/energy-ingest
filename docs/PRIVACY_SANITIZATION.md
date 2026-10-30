@@ -136,7 +136,7 @@ writers or crash durability on every filesystem.
 The source data provider decides whether sanitized material may be submitted.
 An independent maintainer decides whether the submitted fixture is appropriate
 for public release. Automated checks supplement but cannot replace these
-reviews. Follow ADR-0028 and `docs/PROFILE_RELEASES.md` for release policy.
+reviews. Follow ADR-0028 and `docs/dev/PROFILE_RELEASES.md` for release policy.
 
 ## SDG&E observation
 

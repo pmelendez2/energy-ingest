@@ -7,7 +7,7 @@ production container releases.
 **Intended Audience:** Release maintainers and CI/CD operators.
 
 This checklist is not an end-user installation guide. For installation
-see [Installation](INSTALLATION.md).
+see [Installation](../INSTALLATION.md).
 
 ## Mandatory checks before tagging
 
@@ -30,10 +30,18 @@ see [Installation](INSTALLATION.md).
 ## Publishing
 
 The intended stable release version is stored in `release/VERSION`.
-Run `bash scripts/check-prod-package.sh` without arguments to validate it.
-Before publishing, ensure that the signed release tag agrees with this
-version. Explicit versions remain supported for private release candidates
-and historical reproduction.
+Stable production packages and public release tags must match this
+version. Run `bash scripts/check-prod-package.sh` without arguments
+to validate the intended stable package.
+
+Private release candidates use an explicit `X.Y.Z-rc.N` version.
+The private RC publisher validates the requested version, requires
+a clean and synchronized `main` checkout, and checks that the
+requested registry tag does not already exist.
+
+Historical release reproduction requires the appropriate source
+checkout and release metadata. Do not treat a current source
+checkout as equivalent to a historical release.
 
 Publish only by pushing an annotated `energy-ingest-vX.Y.Z` tag.
 The Docker workflow pushes AMD64 and ARM64 version tags, not `latest`.
@@ -48,7 +56,7 @@ API query, ARM64 QEMU smoke tests, and multi-platform publication.
 The published image was separately pulled and executed natively on
 Raspberry Pi 5 `piha` (ARM64); the full database deployment on `piha`
 was not exercised. See
-[release validation](RELEASE_0_1_0_VALIDATION.md).
+[release validation](../testing/RELEASE_0_1_0_VALIDATION.md).
 
 Inspect the published index with:
 

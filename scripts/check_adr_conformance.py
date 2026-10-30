@@ -25,7 +25,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ADR_DIR = REPO_ROOT / "docs" / "adr"
-CONFORMANCE_FILE = REPO_ROOT / "docs" / "ARCHITECTURE_CONFORMANCE.md"
+CONFORMANCE_FILE = REPO_ROOT / "docs" / "dev" / "ARCHITECTURE_CONFORMANCE.md"
 
 ADR_FILENAME_RE = re.compile(r"^(?P<number>\d{4})-.*\.md$")
 ADR_REF_RE = re.compile(r"\bADR-(?P<number>\d{4})\b")
@@ -121,7 +121,7 @@ def check_conformance_index(
 
     if not CONFORMANCE_FILE.is_file():
         errors.append(
-            "Missing docs/ARCHITECTURE_CONFORMANCE.md"
+            "Missing docs/dev/ARCHITECTURE_CONFORMANCE.md"
         )
         return errors, warnings
 
@@ -133,7 +133,7 @@ def check_conformance_index(
         if number not in referenced_numbers:
             errors.append(
                 f"{adr.reference} is Accepted but is not represented "
-                "in docs/ARCHITECTURE_CONFORMANCE.md"
+                "in docs/dev/ARCHITECTURE_CONFORMANCE.md"
             )
 
     for number in sorted(referenced_numbers):
