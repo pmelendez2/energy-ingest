@@ -41,6 +41,22 @@ async fn protected_routes_reject_missing_bearer() {
 }
 
 #[tokio::test]
+async fn association_requires_bearer_token() {
+    let response = app()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/meters/1/resources")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"resource_id":13}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
 async fn unsupported_route_is_not_found() {
     let response = app()
         .oneshot(
@@ -68,6 +84,11 @@ fn openapi_matches_public_routes_and_bearer_contract() {
         assert!(paths[path]["get"].is_object(), "missing {path}");
     }
     assert!(paths["/healthz"]["get"]["security"].is_null());
+    assert!(paths["/v1/meters/{id}/resources"]["post"].is_object());
+    assert_eq!(
+        paths["/v1/meters/{id}/resources"]["post"]["security"][0]["bearer_auth"],
+        serde_json::json!([]),
+    );
     for path in
         ["/v1/meters", "/v1/meters/{id}/stream", "/v1/meters/{id}/window"]
     {

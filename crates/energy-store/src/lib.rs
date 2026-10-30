@@ -26,6 +26,7 @@ mod gb_import;
 mod history_sync;
 mod ingestion_source;
 mod interval_reading;
+mod meter_association;
 mod oauth_authorization;
 mod retrieval_coverage;
 mod usage_stream;
@@ -69,6 +70,9 @@ pub use interval_reading::{
     get_interval_reading_by_identity, get_interval_reading_revision,
     get_or_create_interval_reading, list_interval_reading_revisions,
     set_accepted_interval_reading_revision,
+};
+pub use meter_association::{
+    AssociationError, AssociationOutcome, associate_meter_resource,
 };
 pub use oauth_authorization::{
     OAuthAuthorization, OAuthAuthorizationId, OAuthAuthorizationState,

@@ -380,73 +380,36 @@ async fn execute(args: &[String]) -> Result<(), String> {
             }
         }
         Command::MeterAttach(meter, resource) => {
-            let mut tx = pool
-                .begin()
-                .await
-                .map_err(|_| "database transaction failed")?;
-            let profile: Option<(u64, u32)> = sqlx::query_as(
-                "SELECT data_custodian_id, commodity \
-                 FROM physical_meter WHERE id = ? FOR UPDATE",
-            )
-            .bind(meter)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|_| "meter lookup failed")?;
-            let (custodian, kind) = profile.ok_or("meter profile not found")?;
-            let source: Option<(u64, Option<u32>)> = sqlx::query_as(
-                "SELECT dc.id, rt.commodity \
-                     FROM meter_reading mr \
-                     JOIN usage_point up ON up.id = mr.usage_point_id \
-                     JOIN acquisition_source src \
-                       ON src.id = up.acquisition_source_id \
-                     JOIN data_custodian dc \
-                       ON dc.id = src.data_custodian_id \
-                     JOIN reading_type rt \
-                       ON rt.id = mr.reading_type_id \
-                     WHERE mr.id = ?",
-            )
-            .bind(resource)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|_| "resource lookup failed")?;
-            let (resource_custodian, resource_kind) =
-                source.ok_or("resource not found")?;
-            if custodian != resource_custodian || resource_kind != Some(kind) {
-                return Err("utility or commodity mismatch".into());
-            }
-            let current: Option<(u64,)> = sqlx::query_as(
-                "SELECT physical_meter_id \
-                 FROM physical_meter_resource \
-                 WHERE meter_reading_id = ?",
-            )
-            .bind(resource)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|_| "association lookup failed")?;
-            match current {
-                Some((id,)) if id == meter => {
-                    println!("Resource already associated.");
-                }
-                Some(_) => {
-                    return Err(
-                        "resource belongs to another meter profile".into()
-                    );
-                }
-                None => {
-                    sqlx::query(
-                        "INSERT INTO physical_meter_resource \
-                         (physical_meter_id, meter_reading_id) \
-                         VALUES (?, ?)",
-                    )
-                    .bind(meter)
-                    .bind(resource)
-                    .execute(&mut *tx)
+            use energy_store::{AssociationError, AssociationOutcome};
+            let result =
+                energy_store::associate_meter_resource(&pool, meter, resource)
                     .await
-                    .map_err(|_| "association failed")?;
+                    .map_err(|error| match error {
+                        AssociationError::InvalidId => {
+                            "invalid meter or resource ID"
+                        }
+                        AssociationError::MeterNotFound => {
+                            "meter profile not found"
+                        }
+                        AssociationError::ResourceNotFound => {
+                            "resource not found"
+                        }
+                        AssociationError::IdentityMismatch => {
+                            "utility or commodity mismatch"
+                        }
+                        AssociationError::AssignedElsewhere => {
+                            "resource belongs to another meter profile"
+                        }
+                        AssociationError::Database => "association failed",
+                    })?;
+            match result {
+                AssociationOutcome::Associated => {
                     println!("Resource associated with meter profile.");
                 }
+                AssociationOutcome::AlreadyAssociated => {
+                    println!("Resource already associated.");
+                }
             }
-            tx.commit().await.map_err(|_| "association commit failed")?;
         }
         Command::MeterAttachCompatible(meter, apply) => {
             attach_compatible(&pool, meter, apply).await?;
