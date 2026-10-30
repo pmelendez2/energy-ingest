@@ -3,6 +3,7 @@
 set -euo pipefail
 root="$(git rev-parse --show-toplevel)"
 bash "$root/scripts/check-publication.sh"
+bash "$root/scripts/audit-dependencies.sh"
 
 # An explicit terminal confirmation is required for any manual push.
 if [[ ! -r /dev/tty ]]; then
