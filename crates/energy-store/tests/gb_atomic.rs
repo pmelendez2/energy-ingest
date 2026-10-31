@@ -93,6 +93,8 @@ async fn exact_document_replay_preserves_first_successful_import() {
     .await
     .unwrap();
     assert_eq!(report.accepted, 1);
+    assert_eq!(report.resource_ids.len(), 1);
+    assert_ne!(report.resource_ids[0], 0);
 
     let second = create_ingestion_run(&pool, source).await.unwrap();
     let replay = import_gb_document_atomic_with_hash(
@@ -106,6 +108,7 @@ async fn exact_document_replay_preserves_first_successful_import() {
     .unwrap();
     assert_eq!(replay.observations, 0);
     assert_eq!(replay.accepted, 0);
+    assert_eq!(replay.resource_ids, report.resource_ids);
     let retained: u64 = sqlx::query_scalar(
         "SELECT first_ingestion_run_id FROM import_document \
          WHERE acquisition_source_id = ? AND sha256_hex = ?",

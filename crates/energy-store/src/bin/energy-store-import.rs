@@ -90,7 +90,7 @@ fn short_name(file: &std::path::Path) -> String {
     format!("{start}...{suffix}")
 }
 
-fn print_row(file: &std::path::Path, report: GbImportReport) {
+fn print_row(file: &std::path::Path, report: &GbImportReport) {
     let display = short_name(file);
     println!(
         "{display:<35} {observed:>10} {unchanged:>10} {accepted:>10}",
@@ -162,13 +162,13 @@ async fn run(args: &[String]) -> Result<(), String> {
                 path.display()
             )
         })?;
-        print_row(&path, report);
+        print_row(&path, &report);
         total.observations += report.observations;
         total.unchanged += report.unchanged;
         total.accepted += report.accepted;
     }
     println!("{}", "-".repeat(68));
-    print_row(std::path::Path::new("TOTAL"), total);
+    print_row(std::path::Path::new("TOTAL"), &total);
     println!("Completed. Accepted includes first and revised observations.");
     Ok(())
 }

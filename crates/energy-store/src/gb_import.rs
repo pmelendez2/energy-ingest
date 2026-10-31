@@ -36,7 +36,7 @@ pub enum GbImportError {
 }
 
 /// Number of observations handled by one import.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct GbImportReport {
     /// Total intervals across all supported meters and blocks.
     pub observations: usize,
@@ -45,6 +45,8 @@ pub struct GbImportReport {
     /// Number of observations for which a revision was accepted.
     /// Includes initial observations of previously unseen intervals.
     pub accepted: usize,
+    /// Canonical meter-reading IDs represented by this XML document.
+    pub resource_ids: Vec<u64>,
 }
 
 /// A fully validated interval with its canonical UTC start.
@@ -224,7 +226,36 @@ pub async fn import_gb_document_atomic_with_hash(
         .await
         .map_err(StoreError::from)?;
         if prior.is_some() {
-            return Ok(GbImportReport::default());
+            // Resolve the identities represented by this document even
+            // when its byte-for-byte replay accepts no observations.
+            let mut resource_ids = Vec::with_capacity(meters.len());
+            for linked in &meters {
+                let id: Option<u64> = sqlx::query_scalar(
+                    "SELECT mr.id FROM meter_reading mr \
+                     JOIN usage_point up ON up.id = mr.usage_point_id \
+                     JOIN reading_type rt ON rt.id = mr.reading_type_id \
+                     WHERE up.acquisition_source_id = ? \
+                     AND rt.acquisition_source_id = ? \
+                     AND up.external_id = ? AND rt.external_id = ? \
+                     AND mr.external_id = ?",
+                )
+                .bind(source_id.0)
+                .bind(source_id.0)
+                .bind(&linked.usage.external_id)
+                .bind(&linked.reading_type.external_id)
+                .bind(&linked.meter.external_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(StoreError::from)?;
+                resource_ids
+                    .push(id.ok_or(GbImportError::InvalidRelationships)?);
+            }
+            resource_ids.sort_unstable();
+            resource_ids.dedup();
+            return Ok(GbImportReport {
+                resource_ids,
+                ..GbImportReport::default()
+            });
         }
         sqlx::query(
             "INSERT INTO import_document \
@@ -303,6 +334,8 @@ pub async fn import_gb_document_atomic_with_hash(
         if existing_type != rt {
             return Err(GbImportError::InvalidRelationships);
         }
+
+        report.resource_ids.push(meter);
 
         for block in linked.blocks {
             let block_id = sqlx::query(
@@ -415,6 +448,8 @@ pub async fn import_gb_document_atomic_with_hash(
             }
         }
     }
+    report.resource_ids.sort_unstable();
+    report.resource_ids.dedup();
     tx.commit().await.map_err(StoreError::from)?;
     Ok(report)
 }
