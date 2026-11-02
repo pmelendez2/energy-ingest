@@ -105,6 +105,65 @@ async fn meters(
     Ok(Json(items))
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+struct ResourceAssociationResponse {
+    resource_id: u64,
+    physical_meter_id: Option<u64>,
+    status: &'static str,
+}
+
+/// Read the canonical association; a missing mapping is not a missing resource.
+#[utoipa::path(
+    get,
+    path = "/v1/resources/{id}/association",
+    responses(
+        (status = 200, body = ResourceAssociationResponse),
+        (status = 400, body = ErrorBody),
+        (status = 401, body = ErrorBody),
+        (status = 404, body = ErrorBody),
+    ),
+    security(("bearer_auth" = [])),
+)]
+async fn resource_association(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(resource_id): Path<u64>,
+) -> Result<Json<ResourceAssociationResponse>, ApiError> {
+    require_auth(&state.pool, &headers).await?;
+    if resource_id == 0 {
+        return Err(failure(StatusCode::BAD_REQUEST, "invalid_id"));
+    }
+    let exists: Option<(u64,)> =
+        sqlx::query_as("SELECT id FROM meter_reading WHERE id = ?")
+            .bind(resource_id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|_| {
+                failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error")
+            })?;
+    if exists.is_none() {
+        return Err(failure(StatusCode::NOT_FOUND, "resource_not_found"));
+    }
+    let associated: Option<(u64,)> = sqlx::query_as(
+        "SELECT physical_meter_id FROM physical_meter_resource \
+         WHERE meter_reading_id = ?",
+    )
+    .bind(resource_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error"))?;
+    let physical_meter_id = associated.map(|row| row.0);
+    Ok(Json(ResourceAssociationResponse {
+        resource_id,
+        physical_meter_id,
+        status: if physical_meter_id.is_some() {
+            "associated"
+        } else {
+            "unassociated"
+        },
+    }))
+}
+
 #[derive(Debug, Deserialize, ToSchema)]
 struct AttachResourceRequest {
     resource_id: u64,
@@ -612,10 +671,10 @@ async fn healthz() -> StatusCode {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(healthz, meters, attach_meter_resource, acquisition_sources, stream, window, validation, history_plan,
+    paths(healthz, meters, resource_association, attach_meter_resource, acquisition_sources, stream, window, validation, history_plan,
           import_green_button),
     components(schemas(
-        ErrorBody, Meter, AttachResourceRequest, AttachResourceResponse,
+        ErrorBody, Meter, ResourceAssociationResponse, AttachResourceRequest, AttachResourceResponse,
         AcquisitionSourceResponse, IntervalResponse, IssueResponse, StreamResponse,
         ValidationResponse, HistoryRangeInput, HistoryPreviousInput,
         HistoryPlanRequest, HistoryActionResponse, HistoryPlanResponse,
@@ -735,6 +794,7 @@ pub fn router(pool: Pool<MySql>) -> Router {
     Router::new()
         .route("/healthz", get(healthz))
         .route("/v1/meters", get(meters))
+        .route("/v1/resources/{id}/association", get(resource_association))
         .route("/v1/meters/{id}/resources", post(attach_meter_resource))
         .route("/v1/acquisition-sources", get(acquisition_sources))
         .route("/v1/imports/green-button", post(import_green_button))
