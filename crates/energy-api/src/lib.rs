@@ -108,6 +108,7 @@ async fn meters(
 #[derive(Debug, Serialize, ToSchema)]
 struct ResourceAssociationResponse {
     resource_id: u64,
+    commodity: Option<u32>,
     physical_meter_id: Option<u64>,
     status: &'static str,
 }
@@ -133,17 +134,17 @@ async fn resource_association(
     if resource_id == 0 {
         return Err(failure(StatusCode::BAD_REQUEST, "invalid_id"));
     }
-    let exists: Option<(u64,)> =
-        sqlx::query_as("SELECT id FROM meter_reading WHERE id = ?")
-            .bind(resource_id)
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|_| {
-                failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error")
-            })?;
-    if exists.is_none() {
-        return Err(failure(StatusCode::NOT_FOUND, "resource_not_found"));
-    }
+    let resource: Option<(Option<u32>,)> = sqlx::query_as(
+        "SELECT rt.commodity FROM meter_reading mr \
+             JOIN reading_type rt ON rt.id = mr.reading_type_id \
+             WHERE mr.id = ?",
+    )
+    .bind(resource_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|_| failure(StatusCode::INTERNAL_SERVER_ERROR, "server_error"))?;
+    let (commodity,) = resource
+        .ok_or_else(|| failure(StatusCode::NOT_FOUND, "resource_not_found"))?;
     let associated: Option<(u64,)> = sqlx::query_as(
         "SELECT physical_meter_id FROM physical_meter_resource \
          WHERE meter_reading_id = ?",
@@ -155,6 +156,7 @@ async fn resource_association(
     let physical_meter_id = associated.map(|row| row.0);
     Ok(Json(ResourceAssociationResponse {
         resource_id,
+        commodity,
         physical_meter_id,
         status: if physical_meter_id.is_some() {
             "associated"
