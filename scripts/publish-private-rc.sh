@@ -59,12 +59,33 @@ mkdir -p dist
 bash scripts/package-prod-release.sh "$version" dist
 
 docker buildx inspect --bootstrap
+
 docker buildx build \
     --platform linux/amd64,linux/arm64 \
     --file docker/Dockerfile.prod \
     --tag "$image" \
     --provenance=mode=min \
     --sbom=true \
-    --push .
-docker buildx imagetools inspect "$image"
-echo "Published: $image"
+    --output type=registry,registry.insecure=true .
+
+docker manifest inspect --insecure "$image" |
+    python3 -c '
+import json
+import sys
+
+manifest = json.load(sys.stdin)
+platforms = {
+    (item["platform"]["os"], item["platform"]["architecture"])
+    for item in manifest.get("manifests", [])
+    if "platform" in item
+}
+
+required = {("linux", "amd64"), ("linux", "arm64")}
+
+if not required.issubset(platforms):
+    raise SystemExit("Missing required image architectures")
+
+print("Verified: linux/amd64 and linux/arm64")
+'
+
+echo "[OK] Published to private registry: $image"
