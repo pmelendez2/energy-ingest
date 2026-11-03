@@ -161,6 +161,7 @@ async fn import_response_preserves_resource_ids_on_replay() {
     assert_eq!(ids.len(), 1);
     assert!(ids[0].as_u64().unwrap() > 0);
     assert_eq!(first["accepted"], 1);
+    assert_eq!(first["already_imported"], false);
 
     let replay = post(&issued.token).await.unwrap();
     assert_eq!(replay.status(), StatusCode::OK);
@@ -171,5 +172,6 @@ async fn import_response_preserves_resource_ids_on_replay() {
     assert_eq!(replay["resource_ids"], first["resource_ids"]);
     assert_eq!(replay["observations"], 0);
     assert_eq!(replay["accepted"], 0);
+    assert_eq!(replay["already_imported"], true);
     assert!(revoke_api_client(&pool, issued.client_id).await.unwrap());
 }
