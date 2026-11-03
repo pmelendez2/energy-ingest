@@ -725,6 +725,7 @@ struct ImportQuery {
 
 #[derive(Serialize, ToSchema)]
 struct ImportResult {
+    already_imported: bool,
     resource_ids: Vec<u64>,
     observations: usize,
     unchanged: usize,
@@ -784,6 +785,7 @@ async fn import_green_button(
         failure(StatusCode::UNPROCESSABLE_ENTITY, "import_rejected")
     })?;
     Ok(Json(ImportResult {
+        already_imported: report.already_imported,
         resource_ids: report.resource_ids,
         observations: report.observations,
         unchanged: report.unchanged,

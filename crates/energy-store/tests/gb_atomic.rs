@@ -93,6 +93,7 @@ async fn exact_document_replay_preserves_first_successful_import() {
     .await
     .unwrap();
     assert_eq!(report.accepted, 1);
+    assert!(!report.already_imported);
     assert_eq!(report.resource_ids.len(), 1);
     assert_ne!(report.resource_ids[0], 0);
 
@@ -106,6 +107,7 @@ async fn exact_document_replay_preserves_first_successful_import() {
     )
     .await
     .unwrap();
+    assert!(replay.already_imported);
     assert_eq!(replay.observations, 0);
     assert_eq!(replay.accepted, 0);
     assert_eq!(replay.resource_ids, report.resource_ids);

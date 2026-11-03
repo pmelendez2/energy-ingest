@@ -38,6 +38,8 @@ pub enum GbImportError {
 /// Number of observations handled by one import.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct GbImportReport {
+    /// True when this exact document was imported previously.
+    pub already_imported: bool,
     /// Total intervals across all supported meters and blocks.
     pub observations: usize,
     /// Number of observations matching the accepted revision.
@@ -253,6 +255,7 @@ pub async fn import_gb_document_atomic_with_hash(
             resource_ids.sort_unstable();
             resource_ids.dedup();
             return Ok(GbImportReport {
+                already_imported: true,
                 resource_ids,
                 ..GbImportReport::default()
             });
