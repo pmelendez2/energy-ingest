@@ -28,7 +28,7 @@ see [Installation](../INSTALLATION.md).
 11. Review critical CVE findings, build inputs, SBOM, and provenance.
 12. Verify the source is on `main` and GitHub checks have passed.
 
-## v0.1.8 release gate
+## Stable release gate
 
 Before tagging, run `bash scripts/audit-dependencies.sh` and
 `bash scripts/test-prod-release-versions.sh` in addition to the
