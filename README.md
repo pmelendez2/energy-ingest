@@ -33,19 +33,10 @@ is complete. Home Assistant integration is planned separately.
 
 ## Platform
 
-Currently supported development and runtime platform:
-
-- Ubuntu 26.04
-- Linux
-- Docker/container-oriented deployment
-
-Not currently supported or tested:
-
-- Windows
-- macOS
-
-Portability should not be intentionally prevented in the Rust core where it
-does not add significant complexity.
+Development and deployment target Linux with Docker/container support.
+Other operating systems and supported Linux distribution versions should
+not be excluded without technical evidence. Consult the project testing
+documentation for specifically validated platforms and versions.
 
 ## Security
 
@@ -59,8 +50,9 @@ See `SECURITY.md` and the architecture decision records under `docs/adr/`.
 ## Project status
 
 Production images are published for `linux/amd64` and `linux/arm64`.
-The current development release target is recorded once in
-[`release/VERSION`](release/VERSION). It is not necessarily published yet.
+The current stable release is `0.1.8`. The development release target is
+recorded in [`release/VERSION`](release/VERSION); it can remain unchanged
+while unreleased work is in progress.
 For installation, select the most recent stable
 [GitHub release](https://github.com/pmelendez2/energy-ingest/releases).
 

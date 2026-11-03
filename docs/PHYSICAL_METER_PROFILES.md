@@ -47,6 +47,14 @@ The application rejects incompatible utility and commodity associations.
 Repeat associations are idempotent; associations to another physical meter
 are rejected rather than silently reassigned.
 
+The authenticated `GET /v1/resources/{id}/association` endpoint reports
+the resource's canonical `commodity` (Green Button code `1` for electricity
+or `7` for natural gas), its `physical_meter_id` when associated, and its
+association status. The commodity may be null if the source lacks verified
+metadata; clients must treat null or unsupported values as unresolved and
+must not infer a meter from filenames. This response extension is unreleased
+until a compatible backend image is published and deployed.
+
 Check associations with:
 
 ```bash
