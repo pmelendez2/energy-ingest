@@ -48,11 +48,34 @@ changes in annotations or the applicable release history.
 
 | Release | AI Tool | Model | Date Range |
 |---|---|---|---|
-| 0.1.8 (preparation) | ChatGPT | GPT-6 | 2026-10-30 |
+| Unreleased (post-0.1.8) | ChatGPT | GPT-6 | 2026-11-02 to 2026-11-03 |
+| 0.1.8 | ChatGPT | GPT-6 | 2026-10-30 |
 | 0.1.5-rc.1 | ChatGPT | GPT-6 | 2026-10-20 |
 | Unreleased / 0.1.0-dev | ChatGPT | GPT-5.6 Sol | 2026-09-28 - present |
 
-### 0.1.8 (release preparation)
+### Unreleased (post-0.1.8)
+
+* AI Tool: ChatGPT
+* Model: GPT-6
+* Date Range: 2026-11-02 to 2026-11-03
+* Maintainer Review: Required
+
+#### Areas of AI assistance
+
+- Extending the authenticated resource-association response with canonical
+  commodity metadata for safe Home Assistant meter-selection interfaces.
+- Adding database-backed response assertions and preparing implementation
+  and documentation patches for review.
+
+#### Verification
+
+The maintainer reported 214 passing tests in the isolated Docker suite,
+including formatting, compilation, Clippy, integration tests, ADR checks,
+and documentation checks. Signed commit `ff0bdcc` was pushed on the feature
+branch and draft PR #37 was opened. Review, merge, and publication remain
+pending for this change.
+
+### 0.1.8
 
 * AI Tool: ChatGPT
 * Model: GPT-6
@@ -70,9 +93,10 @@ changes in annotations or the applicable release history.
 
 The maintainer reported 209 passing tests in the isolated Docker suite,
 a successful dependency audit, successful PR #31 CI and secret scans,
-and a verified signed merge commit on `main`. The v0.1.8 release tag,
-Docker Hub publication, native production upgrade, and Home Assistant
-integration validation have not yet been completed.
+and a verified signed merge commit on `main`. GitHub release
+`energy-ingest-v0.1.8` was subsequently published. Docker Hub digest
+verification, native production upgrade, and Home Assistant integration
+validation were not independently revisited for this entry.
 
 ### 0.1.5-rc.1
 

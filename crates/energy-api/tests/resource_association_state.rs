@@ -101,6 +101,7 @@ async fn lookup_reflects_canonical_database_association() {
     let (status, body) = lookup(&pool, &client.token, resource).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["resource_id"], resource);
+    assert_eq!(body["commodity"], 1);
     assert_eq!(body["status"], "unassociated");
     assert!(body["physical_meter_id"].is_null());
 
@@ -111,6 +112,7 @@ async fn lookup_reflects_canonical_database_association() {
     let (status, body) = lookup(&pool, &client.token, resource).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["resource_id"], resource);
+    assert_eq!(body["commodity"], 1);
     assert_eq!(body["status"], "associated");
     assert_eq!(body["physical_meter_id"], meter);
 
