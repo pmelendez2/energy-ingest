@@ -20,7 +20,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use chrono::{DateTime, Local, NaiveDate, Utc};
+use gb::datetime::{NaiveDate, date_from_ymd, local_date};
 use gb::{Commodity, MeterReadingSummary, inspect_file, parse_reader};
 use serde::Deserialize;
 use toml::value::Datetime;
@@ -404,11 +404,11 @@ fn expected_commodity(value: &str) -> Commodity {
     }
 }
 
-/// Converts a TOML calendar date into `chrono::NaiveDate`.
+/// Converts a TOML calendar date into `time::Date`.
 fn manifest_date(value: Datetime) -> NaiveDate {
     let date = value.date.expect("manifest value must be a TOML date");
 
-    NaiveDate::from_ymd_opt(
+    date_from_ymd(
         i32::from(date.year),
         u32::from(date.month),
         u32::from(date.day),
@@ -436,8 +436,7 @@ fn last_reading_date(reading: &MeterReadingSummary) -> Option<NaiveDate> {
 
 /// Converts Unix seconds to the process-local calendar date.
 fn unix_date_local(seconds: i64) -> Option<NaiveDate> {
-    DateTime::<Utc>::from_timestamp(seconds, 0)
-        .map(|value| value.with_timezone(&Local).date_naive())
+    local_date(seconds)
 }
 
 /// Every golden fixture in every discovered provider profile.

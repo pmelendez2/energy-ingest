@@ -6,7 +6,7 @@ use std::env;
 use std::path::Path;
 use std::process::ExitCode;
 
-use chrono::{DateTime, Local, Utc};
+use gb::datetime::format_local;
 use gb::{MeterReadingSummary, inspect_file};
 
 fn main() -> ExitCode {
@@ -159,10 +159,7 @@ fn format_interval(seconds: u64) -> String {
 fn print_time(label: &str, value: Option<i64>) {
     match value.and_then(unix_time_local) {
         Some(value) => {
-            println!(
-                "  {label}: {}",
-                value.format("%Y-%m-%d %H:%M:%S %Z (%:z)",)
-            );
+            println!("  {label}: {}", value);
         }
 
         None => println!("  {label}: Unknown"),
@@ -184,9 +181,8 @@ fn print_last_reading(reading: &MeterReadingSummary) {
     print_time("Last reading", last_start);
 }
 
-fn unix_time_local(seconds: i64) -> Option<DateTime<Local>> {
-    DateTime::<Utc>::from_timestamp(seconds, 0)
-        .map(|value| value.with_timezone(&Local))
+fn unix_time_local(seconds: i64) -> Option<String> {
+    format_local(seconds)
 }
 
 fn interval_validation(reading: &MeterReadingSummary) -> &'static str {

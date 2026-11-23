@@ -25,7 +25,7 @@ use energy_store::{
     get_reading_type_by_external_id, get_usage_point,
     get_usage_point_by_external_id,
 };
-use sqlx::{MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{MySql, Pool};
 
 /// Verifies creation and retrieval of the initial Green Button entity chain.
 ///
@@ -191,7 +191,7 @@ async fn green_button_repository_round_trip() {
 
     assert_eq!(meter_reading_by_external_id.id, meter_reading_id.0);
 
-    let interval_start = NaiveDateTime::parse_from_str(
+    let interval_start = gb::datetime::parse_datetime(
         "2026-01-01 00:00:00",
         "%Y-%m-%d %H:%M:%S",
     )

@@ -13,12 +13,12 @@
 //! writes as a single MariaDB transaction. The ingestion-run record is
 //! created separately by its caller.
 
+use std::collections::BTreeSet;
+
 use crate::{AcquisitionSourceId, IngestionRunId, StoreError};
+use gb::datetime::NaiveDateTime;
 use gb::{GbDocument, IntervalBlockRecord, MeterReadingRecord};
-use sqlx::{
-    MySql, Pool,
-    types::chrono::{DateTime, NaiveDateTime, Utc},
-};
+use sqlx::{MySql, Pool};
 use thiserror::Error;
 
 /// Error returned when source relationships cannot be imported safely.
@@ -76,9 +76,7 @@ struct PreparedMeter<'a> {
 
 /// Converts Unix seconds to canonical UTC without a database operation.
 fn utc(seconds: i64) -> Result<NaiveDateTime, GbImportError> {
-    DateTime::<Utc>::from_timestamp(seconds, 0)
-        .map(|dt| dt.naive_utc())
-        .ok_or(GbImportError::InvalidTimestamp)
+    gb::datetime::utc_seconds(seconds).ok_or(GbImportError::InvalidTimestamp)
 }
 
 /// Validates the complete supported GB relationship graph before writes.
@@ -105,7 +103,17 @@ fn prepare(
             item.related_hrefs.iter().any(|href| href == up_href)
         });
         let usage = usages.next().ok_or(GbImportError::InvalidRelationships)?;
-        if usages.next().is_some() {
+        // A provider can repeat one UsagePoint for separate consumption and
+        // export MeterReadings. Accept equivalent definitions only: never
+        // merge different identifiers or conflicting resource metadata.
+        let links: BTreeSet<_> = usage.related_hrefs.iter().collect();
+        if usages.any(|candidate| {
+            candidate.external_id != usage.external_id
+                || candidate.service_category_kind
+                    != usage.service_category_kind
+                || candidate.related_hrefs.iter().collect::<BTreeSet<_>>()
+                    != links
+        }) {
             return Err(GbImportError::InvalidRelationships);
         }
 
@@ -460,6 +468,58 @@ pub async fn import_gb_document_atomic_with_hash(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Repeated identical service-point definitions are valid in NEM feeds.
+    #[test]
+    fn accepts_repeated_nem_usage_point_without_database_access() {
+        let file = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../profiles/sdge/fixtures/",
+            "sdge-nem-duplicate-usage-point-synthetic.xml"
+        );
+        let doc = gb::parse_file(file).expect("synthetic XML must parse");
+        assert_eq!(doc.usage_points.len(), 2);
+        let prepared = prepare(&doc).expect("matching repeated UsagePoint");
+        assert_eq!(prepared.len(), 2);
+        assert_eq!(prepared[0].reading_type.flow_direction, Some(1));
+        assert_eq!(prepared[1].reading_type.flow_direction, Some(19));
+    }
+
+    /// Equivalent related links do not depend on XML ordering.
+    #[test]
+    fn accepts_reordered_duplicate_usage_point_links() {
+        let file = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../profiles/sdge/fixtures/",
+            "sdge-nem-duplicate-usage-point-synthetic.xml"
+        );
+        let mut doc = gb::parse_file(file).expect("synthetic XML must parse");
+        doc.usage_points[1].related_hrefs.reverse();
+        assert_eq!(prepare(&doc).unwrap().len(), 2);
+    }
+
+    /// Matching links cannot be used to hide a conflicting UsagePoint.
+    #[test]
+    fn rejects_conflicting_duplicate_usage_point_metadata() {
+        let file = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../profiles/sdge/fixtures/",
+            "sdge-nem-duplicate-usage-point-synthetic.xml"
+        );
+        let mut doc = gb::parse_file(file).expect("synthetic XML must parse");
+        doc.usage_points[1].service_category_kind = Some(7);
+        assert!(matches!(
+            prepare(&doc),
+            Err(GbImportError::InvalidRelationships)
+        ));
+        doc.usage_points[1].service_category_kind =
+            doc.usage_points[0].service_category_kind;
+        doc.usage_points[1].external_id.push_str("-conflict");
+        assert!(matches!(
+            prepare(&doc),
+            Err(GbImportError::InvalidRelationships)
+        ));
+    }
 
     #[test]
     fn rejects_empty_document_without_database_access() {

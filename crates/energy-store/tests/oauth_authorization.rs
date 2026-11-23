@@ -17,7 +17,7 @@ use energy_store::{
     create_oauth_authorization, create_usage_point, get_oauth_authorization,
     get_oauth_authorization_by_source, update_oauth_authorization_state,
 };
-use sqlx::{MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{MySql, Pool, types::time::PrimitiveDateTime as NaiveDateTime};
 
 /// Verifies one authorization can coexist with multiple Usage Points.
 ///
@@ -276,7 +276,7 @@ async fn test_pool() -> Pool<MySql> {
 ///
 /// Returns the parsed [`NaiveDateTime`].
 fn timestamp(value: &str) -> NaiveDateTime {
-    NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S")
+    gb::datetime::parse_datetime(value, "%Y-%m-%d %H:%M:%S")
         .expect("static test timestamp should parse")
 }
 

@@ -83,7 +83,7 @@ fn show_results(e: &fixture_privacy::VerifiedSetEvidence) {
 fn privacy_secret() -> Result<String> {
     env::var("FIXTURE_PRIVACY_SECRET").map_err(|_| {
         "Missing FIXTURE_PRIVACY_SECRET. See \
-         docs/PRIVACY_SANITIZATION.md#first-time-setup-privacy-secret"
+         docs/GB_FIXTURE_CONTRIBUTION.md#first-time-setup-privacy-secret"
             .into()
     })
 }
@@ -118,7 +118,7 @@ PREPARE:
 VERIFY:
   Recreate candidates using the source and original private secret;
   compare generated XML and review reports. Never grants approval.
-  Secret setup: docs/PRIVACY_SANITIZATION.md
+  Secret setup: docs/GB_FIXTURE_CONTRIBUTION.md
 
 AUDIT / SANITIZE / VERIFY-FILE / RELATIONSHIPS:
   Diagnostic single-file and relationship operations. These do not

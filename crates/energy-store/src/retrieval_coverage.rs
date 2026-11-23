@@ -19,7 +19,9 @@
 //! Project Contributors. Individual changes are tracked by Git history.
 
 use crate::{AcquisitionSourceId, IngestionRunId, StoreError, UsagePointId};
-use sqlx::{FromRow, MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{
+    FromRow, MySql, Pool, types::time::PrimitiveDateTime as NaiveDateTime,
+};
 
 /// Application-controlled identifier for a retrieval coverage range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

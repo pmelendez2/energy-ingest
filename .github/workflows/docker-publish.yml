@@ -195,4 +195,4 @@ jobs:
             "$archive" "$checksum" \
             --verify-tag \
             --title "Energy Ingest ${version}" \
-            --notes "Production Docker image: docker.io/pmelendez2/gb-energy-ingest:${version}. Download the ZIP and checksum, verify with SHA-256, extract, and follow docs/INSTALL_LINUX.md. Linux amd64 and arm64; Home Assistant integration is planned."
+            --notes-file "docs/releases/${version}.md"

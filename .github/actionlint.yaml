@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT
+#
+# GitHub-hosted Ubuntu 26.04 runner labels are supported by GitHub,
+# but are not recognized by the pinned actionlint 1.7.7 release.
+#
+# actionlint's custom-label mechanism is used only to recognize
+# these two valid labels. These are NOT self-hosted runners.
+# Remove this compatibility configuration once the pinned
+# actionlint version recognizes both labels natively.
+
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04
+    - ubuntu-26.04-arm

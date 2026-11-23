@@ -5,7 +5,7 @@
 //! The input fingerprints must come from authoritative Energy Ingest window
 //! reads. This module does not query storage, infer gaps, or write to HA.
 
-use sqlx::types::chrono::NaiveDateTime;
+use sqlx::types::time::PrimitiveDateTime as NaiveDateTime;
 use std::collections::BTreeMap;
 
 /// One half-open UTC window with its authoritative content identity.
@@ -123,9 +123,10 @@ mod tests {
     use super::*;
 
     fn at(day: u32) -> NaiveDateTime {
-        sqlx::types::chrono::NaiveDate::from_ymd_opt(2026, 10, day)
+        gb::datetime::date_from_ymd(2026, 10, day)
             .unwrap()
-            .and_hms_opt(0, 0, 0)
+            .with_hms(0, 0, 0)
+            .ok()
             .unwrap()
     }
 

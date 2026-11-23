@@ -50,7 +50,7 @@ See `SECURITY.md` and the architecture decision records under `docs/adr/`.
 ## Project status
 
 Production images are published for `linux/amd64` and `linux/arm64`.
-The current stable release is `0.1.8`. The development release target is
+The current stable release is `0.1.9`. The development release target is
 recorded in [`release/VERSION`](release/VERSION); it can remain unchanged
 while unreleased work is in progress.
 For installation, select the most recent stable

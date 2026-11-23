@@ -5,7 +5,7 @@
 **Audience:** Developers, data contributors, profile reviewers, and maintainers.
 
 **Purpose:** Transform real Green Button XML exports into privacy-reviewed,
-reusable test fixtures **for publication in the public `energy_ingest` GitHub
+reusable test fixtures **for publication in the public `energy-ingest` GitHub
 repository**, so that current and future releases can run automated
 regression tests against realistic utility data formats.
 
@@ -137,6 +137,29 @@ The source data provider decides whether sanitized material may be submitted.
 An independent maintainer decides whether the submitted fixture is appropriate
 for public release. Automated checks supplement but cannot replace these
 reviews. Follow ADR-0028 and `docs/dev/PROFILE_RELEASES.md` for release policy.
+
+
+## Submitting a fixture for review
+
+1. Begin with synthetic XML when possible. Clearly label synthetic samples;
+   they do not require privacy approval for customer data.
+2. For an actual utility export, obtain permission from the data owner. Keep
+   original XML outside the Git checkout and out of public issues, PRs,
+   commit history, logs, and CI artifacts.
+3. Prepare and verify the candidate privately using the commands above.
+   Inspect the XML manually for identity and usage-fingerprint disclosures.
+4. Share only the aggregate, reviewed summary in a public issue. Arrange an
+   approved private review channel for the candidate itself; never attach an
+   unapproved export to an issue or pull request.
+5. Obtain documented approval from both the authorized data provider and
+   an independent maintainer. Do not treat successful sanitization tests as
+   publication authorization.
+6. Only after approval, add the minimal fixture and manifest expectations to
+   a feature branch, add parser and importer regression coverage, then submit
+   a pull request for normal review and CI verification.
+
+For Issue #41, the current NEM fixture is wholly synthetic. Any future
+SDG&E-sourced fixture must complete this approval process before publication.
 
 ## SDG&E observation
 
