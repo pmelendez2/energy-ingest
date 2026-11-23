@@ -21,7 +21,9 @@
 //! Project Contributors. Individual changes are tracked by Git history.
 
 use crate::{IngestionRunId, IntervalBlockId, MeterReadingId, StoreError};
-use sqlx::{FromRow, MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{
+    FromRow, MySql, Pool, types::time::PrimitiveDateTime as NaiveDateTime,
+};
 
 /// Application-controlled identifier for a canonical interval reading.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

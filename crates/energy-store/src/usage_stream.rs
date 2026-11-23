@@ -6,10 +6,12 @@
 //! intervals are reconciled. Raw values and revision IDs are preserved.
 
 use crate::StoreError;
-use chrono::{DateTime, Local, Utc};
-use chrono_tz::Tz;
+use jiff::tz::TimeZone;
+
 use sha2::{Digest, Sha256};
-use sqlx::{FromRow, MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{
+    FromRow, MySql, Pool, types::time::PrimitiveDateTime as NaiveDateTime,
+};
 
 /// A source interval with its currently accepted revision and measurement type.
 #[derive(Debug, Clone, PartialEq, Eq, FromRow)]
@@ -165,7 +167,7 @@ pub fn validation_fingerprint(
         .sort_by_key(|i| (i.start, i.duration_seconds, i.meter_reading_id));
     hash.update((intervals.len() as u64).to_be_bytes());
     for interval in intervals {
-        hash.update(interval.start.and_utc().timestamp().to_be_bytes());
+        hash.update(interval.start.assume_utc().unix_timestamp().to_be_bytes());
         hash.update(interval.duration_seconds.to_be_bytes());
         hash.update(interval.raw_value.to_be_bytes());
         hash.update(interval.meter_reading_id.to_be_bytes());
@@ -330,7 +332,7 @@ pub fn resolve_candidates_with_gas_zone(
     gas_zone: Option<Tz>,
 ) -> StreamResolution {
     resolve_candidates_with_reporting_day(candidates, |candidate| {
-        gas_zone.and_then(|zone| gas_reporting_day(candidate, zone))
+        gas_zone.as_ref().and_then(|zone| gas_reporting_day(candidate, zone))
     })
 }
 
@@ -347,7 +349,7 @@ fn resolve_candidates_with_reporting_day<F>(
     reporting_day: F,
 ) -> StreamResolution
 where
-    F: Fn(&StreamCandidate) -> Option<chrono::NaiveDate>,
+    F: Fn(&StreamCandidate) -> Option<time::Date>,
 {
     candidates.sort_by_key(|c| {
         (c.interval_start, c.interval_duration_seconds, c.interval_reading_id)
@@ -380,11 +382,11 @@ where
             );
             continue;
         }
-        let Some(end) = candidate.interval_start.checked_add_signed(
-            chrono::Duration::seconds(i64::from(
-                candidate.interval_duration_seconds,
-            )),
-        ) else {
+        let Some(end) =
+            candidate.interval_start.checked_add(time::Duration::seconds(
+                i64::from(candidate.interval_duration_seconds),
+            ))
+        else {
             issue(
                 &mut result,
                 StreamIssueKind::InvalidDuration,
@@ -447,7 +449,7 @@ where
             let same_day = day.is_some() && day == previous_day;
             let next_day = day
                 .zip(previous_day)
-                .is_some_and(|(a, b)| b.succ_opt() == Some(a));
+                .is_some_and(|(a, b)| b.next_day() == Some(a));
             let exact = candidate.interval_start == previous.interval_start
                 && end == *previous_end;
             if same_day || exact {
@@ -482,7 +484,7 @@ where
             if candidate.interval_start < *previous_end {
                 let allowed_dst_overlap = next_day
                     && *previous_end - candidate.interval_start
-                        == chrono::Duration::hours(1);
+                        == time::Duration::hours(1);
                 if !allowed_dst_overlap {
                     issue(
                         &mut result,
@@ -538,43 +540,41 @@ fn issue(
 
 /// Resolve the reporting day with the container's system local time.
 /// No additional environment variable or meter-specific setting is read.
-fn gas_reporting_day_local(
-    candidate: &StreamCandidate,
-) -> Option<chrono::NaiveDate> {
-    if candidate.commodity != Some(7)
-        || candidate.interval_duration_seconds != 86_400
-    {
-        return None;
-    }
-    let utc = DateTime::<Utc>::from_naive_utc_and_offset(
-        candidate.interval_start,
-        Utc,
-    );
-    let local = utc.with_timezone(&Local);
-    if local.format("%H:%M:%S").to_string() != "23:59:00" {
-        return None;
-    }
-    Some(local.date_naive())
+fn gas_reporting_day_local(candidate: &StreamCandidate) -> Option<time::Date> {
+    gas_reporting_day_inner(candidate, &TimeZone::system())
 }
 
 fn gas_reporting_day(
     candidate: &StreamCandidate,
-    zone: Tz,
-) -> Option<chrono::NaiveDate> {
+    zone: &Tz,
+) -> Option<time::Date> {
+    gas_reporting_day_inner(candidate, &zone.0)
+}
+
+fn gas_reporting_day_inner(
+    candidate: &StreamCandidate,
+    zone: &TimeZone,
+) -> Option<time::Date> {
     if candidate.commodity != Some(7)
         || candidate.interval_duration_seconds != 86_400
     {
         return None;
     }
-    let utc = DateTime::<Utc>::from_naive_utc_and_offset(
-        candidate.interval_start,
-        Utc,
-    );
-    let local = utc.with_timezone(&zone);
-    if local.format("%H:%M:%S").to_string() != "23:59:00" {
-        return None;
+    let seconds = candidate.interval_start.assume_utc().unix_timestamp();
+    let (date, hour, minute, second) =
+        gb::datetime::local_datetime_fields(seconds, zone)?;
+    (hour == 23 && minute == 59 && second == 0).then_some(date)
+}
+
+/// Verified IANA zone for gas reporting. Parsing validates the zone name.
+#[derive(Debug, Clone)]
+pub struct Tz(TimeZone);
+
+impl std::str::FromStr for Tz {
+    type Err = jiff::Error;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        TimeZone::get(value).map(Self)
     }
-    Some(local.date_naive())
 }
 
 #[cfg(test)]
@@ -593,7 +593,7 @@ mod validation_contract_tests {
     #[test]
     fn validated_stream_only_counts_selected_intervals() {
         let sample = SelectedInterval {
-            start: NaiveDateTime::parse_from_str(
+            start: gb::datetime::parse_datetime(
                 "2026-01-01T00:00:00",
                 "%Y-%m-%dT%H:%M:%S",
             )

@@ -12,7 +12,9 @@
 //! Project Contributors. Individual changes are tracked by Git history.
 
 use crate::StoreError;
-use sqlx::{FromRow, MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{
+    FromRow, MySql, Pool, types::time::PrimitiveDateTime as NaiveDateTime,
+};
 
 /// Application-controlled identifier for a Data Custodian.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

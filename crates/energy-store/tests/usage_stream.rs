@@ -3,10 +3,9 @@
 //! Deterministic unit-style coverage without a live database.
 
 use energy_store::{StreamCandidate, StreamIssueKind, resolve_candidates};
-use sqlx::types::chrono::NaiveDateTime;
 
 fn candidate(id: u64, hour: u32, duration: u32, value: i64) -> StreamCandidate {
-    let start = NaiveDateTime::parse_from_str(
+    let start = gb::datetime::parse_datetime(
         &format!("2026-01-01 {hour:02}:00:00"),
         "%Y-%m-%d %H:%M:%S",
     )
@@ -34,7 +33,7 @@ fn candidate(id: u64, hour: u32, duration: u32, value: i64) -> StreamCandidate {
 
 fn dated(mut c: StreamCandidate, day: u32) -> StreamCandidate {
     c.source_updated_at = Some(
-        NaiveDateTime::parse_from_str(
+        gb::datetime::parse_datetime(
             &format!("2026-10-{day:02} 12:00:00"),
             "%Y-%m-%d %H:%M:%S",
         )
@@ -220,7 +219,7 @@ fn forward_electricity_still_resolves() {
 fn gas_day(id: u64, utc: &str, value: i64) -> StreamCandidate {
     let mut c = candidate(id, 0, 86_400, value);
     c.interval_start =
-        NaiveDateTime::parse_from_str(utc, "%Y-%m-%d %H:%M:%S").unwrap();
+        gb::datetime::parse_datetime(utc, "%Y-%m-%d %H:%M:%S").unwrap();
     c.commodity = Some(7);
     c.unit_of_measure = Some(169);
     c.flow_direction = Some(0);

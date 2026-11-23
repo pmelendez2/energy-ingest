@@ -18,7 +18,7 @@ use energy_store::{
     get_retrieval_coverage, get_retrieval_coverage_revision,
     list_retrieval_gaps,
 };
-use sqlx::{MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{MySql, Pool, types::time::PrimitiveDateTime as NaiveDateTime};
 
 /// Verifies idempotent source-wide coverage and gap history.
 ///
@@ -315,7 +315,7 @@ async fn test_pool() -> Pool<MySql> {
 ///
 /// Static timestamps used by these tests parse successfully.
 fn timestamp(value: &str) -> NaiveDateTime {
-    NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S")
+    gb::datetime::parse_datetime(value, "%Y-%m-%d %H:%M:%S")
         .expect("static test timestamp should parse")
 }
 

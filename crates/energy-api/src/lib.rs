@@ -11,7 +11,6 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     routing::{get, post},
 };
-use chrono::NaiveDateTime;
 use energy_store::{
     AcquisitionSourceId, AssociationError, AssociationOutcome, HistoryWindow,
     MAX_WINDOW_CANDIDATES, StoreError, authenticate_api_token,
@@ -20,6 +19,7 @@ use energy_store::{
     resolve_meter_window, resolve_physical_meter_stream,
     summarize_meter_validation, window_fingerprint,
 };
+use gb::datetime::NaiveDateTime;
 use gb::parse_reader;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -387,7 +387,7 @@ async fn stream(
         .intervals
         .into_iter()
         .map(|item| IntervalResponse {
-            start_utc: item.start.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            start_utc: gb::datetime::format_utc(item.start),
             duration_seconds: item.duration_seconds,
             raw_value: item.raw_value,
             meter_reading_id: item.meter_reading_id,
@@ -429,13 +429,13 @@ fn parse_window(
         if !value.ends_with('Z') {
             return None;
         }
-        NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%SZ").ok()
+        gb::datetime::parse_datetime(value, "%Y-%m-%dT%H:%M:%SZ").ok()
     }
     let start = parse(&query.start)
         .ok_or_else(|| failure(StatusCode::BAD_REQUEST, "invalid_window"))?;
     let end = parse(&query.end)
         .ok_or_else(|| failure(StatusCode::BAD_REQUEST, "invalid_window"))?;
-    let seconds = end.signed_duration_since(start).num_seconds();
+    let seconds = (end - start).whole_seconds();
     if seconds <= 0 || seconds > 31 * 86_400 {
         return Err(failure(StatusCode::BAD_REQUEST, "invalid_window"));
     }
@@ -484,7 +484,7 @@ async fn window(
         .intervals
         .into_iter()
         .map(|item| IntervalResponse {
-            start_utc: item.start.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            start_utc: gb::datetime::format_utc(item.start),
             duration_seconds: item.duration_seconds,
             raw_value: item.raw_value,
             meter_reading_id: item.meter_reading_id,
@@ -602,8 +602,8 @@ fn history_plan_response(
                 })
                 .and_then(|range| range.fingerprint.clone());
             HistoryActionResponse {
-                start: item.start.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-                end: item.end.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                start: gb::datetime::format_utc(item.start),
+                end: gb::datetime::format_utc(item.end),
                 action: item.action.as_str(),
                 current_fingerprint: fingerprint,
             }

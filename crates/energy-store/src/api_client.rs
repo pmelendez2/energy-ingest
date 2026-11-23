@@ -17,8 +17,8 @@ const ENCODED_BYTES: usize = 43;
 pub struct ApiClient {
     pub id: u64,
     pub name: String,
-    pub created_at: chrono::NaiveDateTime,
-    pub revoked_at: Option<chrono::NaiveDateTime>,
+    pub created_at: time::PrimitiveDateTime,
+    pub revoked_at: Option<time::PrimitiveDateTime>,
 }
 
 /// The caller must securely deliver the token; it cannot be retrieved later.

@@ -4,7 +4,7 @@
 //! A fingerprint does not provide a globally ordered change cursor.
 
 use crate::SelectedInterval;
-use chrono::NaiveDateTime;
+use gb::datetime::NaiveDateTime;
 use sha2::{Digest, Sha256};
 
 /// Hash a meter/window and the canonical selected observations.
@@ -21,8 +21,8 @@ pub fn window_fingerprint(
     let mut hasher = Sha256::new();
     hasher.update(b"energy-ingest-window-v1\0");
     hasher.update(meter_id.to_be_bytes());
-    hasher.update(start.and_utc().timestamp().to_be_bytes());
-    hasher.update(end.and_utc().timestamp().to_be_bytes());
+    hasher.update(start.assume_utc().unix_timestamp().to_be_bytes());
+    hasher.update(end.assume_utc().unix_timestamp().to_be_bytes());
 
     // The resolver already returns chronologically ordered intervals.
     // Sort again to make the hash independent of input vector order.
@@ -30,7 +30,7 @@ pub fn window_fingerprint(
     selected.sort_by_key(|i| (i.start, i.duration_seconds, i.meter_reading_id));
     hasher.update((selected.len() as u64).to_be_bytes());
     for item in &selected {
-        hasher.update(item.start.and_utc().timestamp().to_be_bytes());
+        hasher.update(item.start.assume_utc().unix_timestamp().to_be_bytes());
         hasher.update(item.duration_seconds.to_be_bytes());
         hasher.update(item.raw_value.to_be_bytes());
         hasher.update(item.meter_reading_id.to_be_bytes());
@@ -52,7 +52,7 @@ mod tests {
     use super::*;
 
     fn dt(s: &str) -> NaiveDateTime {
-        NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+        gb::datetime::parse_datetime(s, "%Y-%m-%dT%H:%M:%S")
             .expect("valid time")
     }
 

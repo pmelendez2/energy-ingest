@@ -16,11 +16,9 @@
 use std::collections::BTreeSet;
 
 use crate::{AcquisitionSourceId, IngestionRunId, StoreError};
+use gb::datetime::NaiveDateTime;
 use gb::{GbDocument, IntervalBlockRecord, MeterReadingRecord};
-use sqlx::{
-    MySql, Pool,
-    types::chrono::{DateTime, NaiveDateTime, Utc},
-};
+use sqlx::{MySql, Pool};
 use thiserror::Error;
 
 /// Error returned when source relationships cannot be imported safely.
@@ -78,9 +76,7 @@ struct PreparedMeter<'a> {
 
 /// Converts Unix seconds to canonical UTC without a database operation.
 fn utc(seconds: i64) -> Result<NaiveDateTime, GbImportError> {
-    DateTime::<Utc>::from_timestamp(seconds, 0)
-        .map(|dt| dt.naive_utc())
-        .ok_or(GbImportError::InvalidTimestamp)
+    gb::datetime::utc_seconds(seconds).ok_or(GbImportError::InvalidTimestamp)
 }
 
 /// Validates the complete supported GB relationship graph before writes.

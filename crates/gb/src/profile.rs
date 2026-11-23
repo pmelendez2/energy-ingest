@@ -5,8 +5,10 @@ use std::error::Error;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+use crate::datetime::{
+    NaiveDate, date_from_ymd, local_date as zone_local_date,
+};
 use crate::{Commodity, MeterReadingSummary, inspect_file};
-use chrono::{DateTime, Local, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use toml::value::Datetime;
 
@@ -61,12 +63,8 @@ pub fn valid_id(value: &str) -> bool {
 
 fn date(value: &Datetime) -> Result<NaiveDate> {
     let d = value.date.ok_or("expected TOML date")?;
-    NaiveDate::from_ymd_opt(
-        i32::from(d.year),
-        u32::from(d.month),
-        u32::from(d.day),
-    )
-    .ok_or_else(|| "invalid calendar date".into())
+    date_from_ymd(i32::from(d.year), u32::from(d.month), u32::from(d.day))
+        .ok_or_else(|| "invalid calendar date".into())
 }
 
 fn secure_fixture_file(dir: &Path, name: &str) -> Result<PathBuf> {
@@ -173,8 +171,7 @@ pub fn add(dir: &Path, file: &Path) -> Result<()> {
 }
 
 fn local_date(seconds: i64) -> Option<NaiveDate> {
-    DateTime::<Utc>::from_timestamp(seconds, 0)
-        .map(|x| x.with_timezone(&Local).date_naive())
+    zone_local_date(seconds)
 }
 
 fn final_date(reading: &MeterReadingSummary) -> Option<NaiveDate> {

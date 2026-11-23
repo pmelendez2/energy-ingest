@@ -26,10 +26,10 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use chrono::DateTime;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
 use thiserror::Error;
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 /// Green Button commodity associated with a MeterReading.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -939,8 +939,8 @@ fn parse_timestamp_unix(
     field: &'static str,
     value: &str,
 ) -> Result<i64, InspectionError> {
-    DateTime::parse_from_rfc3339(value)
-        .map(|timestamp| timestamp.timestamp())
+    OffsetDateTime::parse(value, &Rfc3339)
+        .map(|timestamp| timestamp.unix_timestamp())
         .map_err(|_| InspectionError::InvalidTimestamp {
             field,
             value: value.to_string(),

@@ -4,10 +4,10 @@
 //! Uses only synthetic test records, cleaned up after each test.
 
 use energy_store::{StreamIssueKind, resolve_meter_window};
-use sqlx::{MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{MySql, Pool, types::time::PrimitiveDateTime as NaiveDateTime};
 
 fn instant(hour: u32, minute: u32) -> NaiveDateTime {
-    NaiveDateTime::parse_from_str(
+    gb::datetime::parse_datetime(
         &format!("2026-01-01 {hour:02}:{minute:02}:00"),
         "%Y-%m-%d %H:%M:%S",
     )
@@ -256,12 +256,12 @@ impl<'a> Fixture<'a> {
         offset: u32,
         value: i64,
     ) -> u64 {
-        let midnight = sqlx::types::chrono::NaiveDateTime::parse_from_str(
+        let midnight = gb::datetime::parse_datetime(
             "2026-01-01 00:00:00",
             "%Y-%m-%d %H:%M:%S",
         )
         .unwrap();
-        let start = midnight + chrono::Duration::seconds(i64::from(offset));
+        let start = midnight + time::Duration::seconds(i64::from(offset));
         let id = sqlx::query(
             "INSERT INTO interval_reading \
              (meter_reading_id, interval_start, \

@@ -20,7 +20,7 @@ use energy_store::{
     get_or_create_interval_reading, list_interval_reading_revisions,
     set_accepted_interval_reading_revision,
 };
-use sqlx::{MySql, Pool, types::chrono::NaiveDateTime};
+use sqlx::{MySql, Pool};
 
 /// Verifies canonical interval identity and revision-history behavior.
 ///
@@ -55,7 +55,7 @@ async fn interval_reading_repository_preserves_revision_history() {
         .await
         .expect("test fixture creation should succeed");
 
-    let interval_start = NaiveDateTime::parse_from_str(
+    let interval_start = gb::datetime::parse_datetime(
         "2026-01-01 00:00:00",
         "%Y-%m-%d %H:%M:%S",
     )
@@ -202,12 +202,12 @@ async fn interval_reading_repository_rejects_foreign_accepted_revision() {
         .await
         .expect("test fixture creation should succeed");
 
-    let first_start = NaiveDateTime::parse_from_str(
+    let first_start = gb::datetime::parse_datetime(
         "2026-01-01 00:00:00",
         "%Y-%m-%d %H:%M:%S",
     )
     .expect("static test timestamp should parse");
-    let second_start = NaiveDateTime::parse_from_str(
+    let second_start = gb::datetime::parse_datetime(
         "2026-01-01 01:00:00",
         "%Y-%m-%d %H:%M:%S",
     )
@@ -397,7 +397,7 @@ async fn create_fixture(
     )
     .await?;
 
-    let block_start = NaiveDateTime::parse_from_str(
+    let block_start = gb::datetime::parse_datetime(
         "2026-01-01 00:00:00",
         "%Y-%m-%d %H:%M:%S",
     )
