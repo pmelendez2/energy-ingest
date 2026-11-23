@@ -7,14 +7,60 @@ on:
 permissions:
   contents: read
 jobs:
+  # Keep the required branch-protection context always reported.
   isolated:
     runs-on: ubuntu-26.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Classify changes (fail closed)
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          if [[ "$EVENT_NAME" != pull_request ]]; then
+            echo 'plan=full' >> "$GITHUB_OUTPUT"
+          else
+            python3 scripts/ci-change-plan.py \
+              --base "$BASE_SHA" --head "$HEAD_SHA" \
+              --github-output "$GITHUB_OUTPUT"
+          fi
+      - name: Verify CI routing and release-claim checker
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Check committed whitespace
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+            git diff --check "$base" "$HEAD_SHA"
+          else
+            git show --check --format=oneline HEAD
+          fi
+      - name: Validate documentation
+        run: |
+          python3 scripts/check-docs.py --strict-metadata
+          python3 scripts/check-doc-release.py
+          python3 scripts/check-release-notes.py
       - name: Verify production release versions
+        if: steps.plan.outputs.plan != 'docs'
         run: bash scripts/test-prod-release-versions.sh
+      - name: Lint GitHub Actions workflows
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo:ro" -w /repo \
+            rhysd/actionlint:1.7.7 -color
       - name: Audit Rust dependencies
+        if: steps.plan.outputs.plan != 'docs'
         run: bash scripts/audit-dependencies.sh --install
       - name: Verify with isolated MariaDB
+        if: steps.plan.outputs.plan == 'full'
         run: bash deploy/docker-compose/test.sh

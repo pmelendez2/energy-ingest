@@ -93,7 +93,7 @@ Rust CLI and database integration tests:
    outside Git and do not paste them into issue reports.
 4. Install the documented development Rust toolchain.
 5. Use authorized local XML samples. Never commit customer exports. Consult
-   [`PRIVACY_SANITIZATION.md`](../PRIVACY_SANITIZATION.md) before considering
+   [`GB_FIXTURE_CONTRIBUTION.md`](../GB_FIXTURE_CONTRIBUTION.md) before considering
    fixtures for publication.
 6. Register a custodian and acquisition source using `energy-store-admin`,
    if your development database does not already contain them.
