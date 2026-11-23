@@ -12,4 +12,4 @@ time = { version = "0.3", features = ["parsing", "formatting", "macros"] }
 quick-xml = "0.42.0"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
-toml = "0.9"
+toml = "1.1"
