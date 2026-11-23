@@ -90,15 +90,15 @@ Expected digest for the immutable `0.1.0` index:
 sha256:d0eb788c6342f6b90e1d15a4048889cf2fb44d8f9b832505ca29ea8d18bffb62
 ```
 
-## Next-release CI/CD improvement
+## Current CI/CD release verification
 
-The current working-tree release workflow uses a native ARM64 runner
-for its smoke job and configures a BuildKit cache. These changes are
-post-`0.1.0` and do not alter the previously published image. Verify
-that they are committed and active on the release branch before relying
-on them. Benchmark a subsequent release before claiming reduced build
-duration; cache reuse does not ensure that the published image is
-bit-for-bit identical to the separately tested smoke image.
+The release workflow uses a native ARM64 runner for smoke testing
+and a BuildKit cache for production builds. These checks apply to
+the source at the release tag, not to previously published releases.
+The cache does not guarantee that the published image is bit-for-bit
+identical to the separately tested smoke image. Check the published
+digest, platform manifests, and complete tag-triggered workflow
+before approving a production upgrade.
 
 ## Guided multi-meter selection
 

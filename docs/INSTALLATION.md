@@ -73,6 +73,28 @@ Physical meter registration requires an administration image supporting
 the `meter set-number` command, available beginning with v0.1.4.
 Earlier releases do not support this onboarding procedure.
 
+### Repeat imports and recovery
+
+The guided importer checks previously staged files before copying data.
+Identical staged copies can be reused. If a file has the same name but
+changed contents, review its replacement prompt carefully. The original
+utility export is never modified by the guided import operation.
+
+The import report distinguishes observations read from files, unchanged
+observations, and newly accepted or corrected observations. A repeat
+import should not create duplicate readings. If importing several files
+is interrupted, earlier files may already have been accepted; correct
+the failure and retry rather than assuming the entire batch rolled back.
+
+Meter matching is a separate confirmation. If more than one physical
+meter of the same commodity exists, do not infer the correct meter from
+filenames or combine meter histories automatically. Complete the guided
+review or use the documented administrative meter commands.
+
+Keep original XML in a backed-up directory outside the installation;
+managed staging files may be lost if the installation directory is
+removed. See [Command Reference](SCRIPT_COMMANDS.md) for command options.
+
 ## 4. Verify the installation and import
 
 Recheck deployment health:

@@ -42,6 +42,26 @@ Meter numbers are entered privately and sent to the Rust backend on stdin.
 Its internal import job is not a separate user-facing workflow.
 `register-prod.sh` and `meter-prod.sh` remain administrative helpers.
 
+## Guided import options and results
+
+Use `--file 'name.xml'` to select a single XML file or a quoted pattern
+such as `--file 'electric-*.xml'` to select a subset. The default is
+`*.xml`. The guided importer normally chooses or registers a utility
+source interactively. Advanced operators can specify an existing source
+with `--source-id ID`; review the utility and source names displayed
+before approving the import. Source IDs do not identify physical meters.
+
+The import report distinguishes **Observed**, **Unchanged**, and
+**Accepted** readings. Importing an unchanged file again should report
+unchanged observations, not duplicate stored usage. If an import fails
+partway through multiple files, earlier files may have been saved.
+Correct the issue and retry safely without erasing the database.
+
+When two physical meters have the same commodity, guided import must
+not guess the association. Review the resource-to-meter assignments
+with the administrative meter tools and confirm each belongs to the
+selected meter. Missing observations remain missing.
+
 ## Analyze and manage meters
 
 ```bash
