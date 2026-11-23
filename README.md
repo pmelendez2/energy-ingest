@@ -50,9 +50,10 @@ See `SECURITY.md` and the architecture decision records under `docs/adr/`.
 ## Project status
 
 Production images are published for `linux/amd64` and `linux/arm64`.
-The current stable release is `0.1.9`. The development release target is
-recorded in [`release/VERSION`](release/VERSION); it can remain unchanged
-while unreleased work is in progress.
+The published production release is `0.1.9`. The next planned release
+is `0.1.10`, recorded in [`release/VERSION`](release/VERSION).
+The planned version must not be installed until its GitHub release and
+Docker images have been published and verified.
 For installation, select the most recent stable
 [GitHub release](https://github.com/pmelendez2/energy-ingest/releases).
 
