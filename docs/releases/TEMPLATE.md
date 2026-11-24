@@ -10,7 +10,21 @@ Describe the most important user-visible changes.
 
 ## Fixes
 
-Describe corrected issues and relevant issue/PR links.
+Describe corrected behavior and security fixes.
+
+## Issues resolved
+
+List each fixed issue using its direct GitHub link, e.g.:
+
+- [#123 — Short description](https://github.com/pmelendez2/energy-ingest/issues/123):
+  Explain the user-visible fix.
+
+For releases without resolved issues, use `None` on its own line.
+Do not claim that a merged issue or PR shipped before its release.
+
+## Related pull requests
+
+Link implementation and release-preparation PRs, or state `None`.
 
 ## Compatibility and upgrade notes
 
